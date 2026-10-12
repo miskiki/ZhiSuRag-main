@@ -1,0 +1,17 @@
+[Unit]
+Description=WeKnora first-boot initialization (runs once)
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+Before=zhishu.service
+ConditionPathExists=/usr/local/sbin/zhishu-firstboot.sh
+ConditionPathExists=!/opt/ZhiShu/.firstboot.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/zhishu-firstboot.sh
+RemainAfterExit=no
+TimeoutStartSec=900
+
+[Install]
+WantedBy=multi-user.target

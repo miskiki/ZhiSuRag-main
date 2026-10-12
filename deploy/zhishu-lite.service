@@ -1,0 +1,23 @@
+[Unit]
+Description=ZhiShu Lite - Knowledge Base Management System
+After=network.target
+
+[Service]
+Type=simple
+User=zhishu
+Group=zhishu
+WorkingDirectory=/opt/zhishu
+EnvironmentFile=/opt/zhishu/.env.lite
+ExecStart=/opt/zhishu/ZhiShu-lite
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/zhishu/data
+
+[Install]
+WantedBy=multi-user.target

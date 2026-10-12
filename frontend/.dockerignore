@@ -1,0 +1,10 @@
+# 构建上下文：multi-stage 构建需要完整前端源码（package*.json、src、
+# vite 配置等）。显式排除本地构建产物与依赖目录，保证上下文轻量。
+node_modules
+dist
+dist-ssr
+.git
+.vite
+coverage
+*.log
+cypress
