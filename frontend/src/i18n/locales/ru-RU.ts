@@ -4499,7 +4499,6 @@
     firstTime: 'Впервые в ZhiShu?',
     registerSuccess: 'Регистрация завершена. Войдите в систему',
     registerFailed: 'Ошибка регистрации',
-    subtitle: 'RAG, ReAct-агент и Wiki — корпоративный фреймворк знаний на основе больших моделей',
     registerSubtitle: 'Создайте аккаунт и начните работу с ZhiShu',
     emailPlaceholder: 'Введите адрес электронной почты',
     passwordPlaceholder: 'Введите пароль (8-32 символа, включая буквы и цифры)',

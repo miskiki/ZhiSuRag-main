@@ -110,7 +110,6 @@
           </div>
           <div class="form-header">
             <h2 class="form-title">{{ $t('auth.login') }}</h2>
-            <p class="form-welcome">{{ $t('auth.subtitle') }}</p>
             <p v-if="registrationEnabled" class="form-hint">{{ $t('auth.loginHint') }}</p>
           </div>
 
@@ -1396,13 +1395,6 @@ onMounted(async () => {
   font-weight: 600;
   color: var(--td-text-color-primary);
   margin: 0 0 6px 0;
-  font-family: var(--app-font-family);
-}
-
-.form-welcome {
-  font-size: 13px;
-  color: var(--td-text-color-secondary);
-  margin: 0;
   font-family: var(--app-font-family);
 }
 
