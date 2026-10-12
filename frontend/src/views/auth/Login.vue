@@ -1,97 +1,30 @@
 <template>
   <div class="login-layout">
-    <div class="animated-bg">
-      <div class="knowledge-node node-1">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
-          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-2">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-3">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2L2 7l10 5 10-5-10-5z" />
-          <path d="M2 17l10 5 10-5" />
-          <path d="M2 12l10 5 10-5" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-4">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <ellipse cx="12" cy="5" rx="9" ry="3" />
-          <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3" />
-          <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-5">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-6">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path
-            d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-          <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-          <line x1="12" y1="22.08" x2="12" y2="12" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-7">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-          <polyline points="14 2 14 8 20 8" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-8">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-          <circle cx="9" cy="7" r="4" />
-          <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-          <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-9">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-10">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3" />
-          <path
-            d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-11">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M9 11l3 3L22 4" />
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-        </svg>
-      </div>
-      <div class="knowledge-node node-12">
-        <svg class="node-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon
-            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-        </svg>
-      </div>
+    <div class="animated-bg" aria-hidden="true">
+      <!-- 极光光斑：大面积柔光，缓慢漂移（transform/opacity 动画，GPU 友好） -->
+      <div class="aurora-blob blob-1"></div>
+      <div class="aurora-blob blob-2"></div>
+      <div class="aurora-blob blob-3"></div>
+      <div class="aurora-blob blob-4"></div>
 
-      <svg class="knowledge-lines" viewBox="0 0 100 100" preserveAspectRatio="none">
-        <line class="connection-line line-1" x1="20" y1="15" x2="35" y2="25" />
-        <line class="connection-line line-2" x1="35" y1="25" x2="55" y2="20" />
-        <line class="connection-line line-3" x1="55" y1="20" x2="85" y2="12" />
-        <line class="connection-line line-4" x1="8" y1="35" x2="25" y2="45" />
-        <line class="connection-line line-5" x1="25" y1="45" x2="65" y2="48" />
-        <line class="connection-line line-6" x1="20" y1="60" x2="60" y2="75" />
-        <line class="connection-line line-7" x1="20" y1="15" x2="20" y2="60" />
-        <line class="connection-line line-8" x1="55" y1="20" x2="45" y2="50" />
-        <line class="connection-line line-9" x1="65" y1="48" x2="90" y2="38" />
-        <line class="connection-line line-10" x1="40" y1="70" x2="75" y2="80" />
-        <line class="connection-line line-11" x1="35" y1="25" x2="25" y2="45" />
-        <line class="connection-line line-12" x1="75" y1="30" x2="65" y2="48" />
+      <!-- 旋转光环：conic 渐变亮弧沿圆环缓慢扫过 -->
+      <div class="glow-ring ring-1"></div>
+      <div class="glow-ring ring-2"></div>
+
+      <!-- 微光粒子：如萤火般上浮闪烁 -->
+      <div class="firefly dot-1"></div>
+      <div class="firefly dot-2"></div>
+      <div class="firefly dot-3"></div>
+      <div class="firefly dot-4"></div>
+      <div class="firefly dot-5"></div>
+      <div class="firefly dot-6"></div>
+      <div class="firefly dot-7"></div>
+      <div class="firefly dot-8"></div>
+
+      <!-- 底部层叠波纹：双层剪影横向缓移 -->
+      <svg class="bg-waves" viewBox="0 0 1440 220" preserveAspectRatio="none">
+        <path class="wave wave-1" d="M0,120 C240,60 480,180 720,120 C960,60 1200,180 1440,120 L1440,220 L0,220 Z" />
+        <path class="wave wave-2" d="M0,160 C260,110 520,210 780,160 C1040,110 1240,200 1440,160 L1440,220 L0,220 Z" />
       </svg>
     </div>
 
@@ -827,7 +760,8 @@ onMounted(async () => {
   min-height: 100%;
   overflow: hidden;
   position: relative;
-  background: linear-gradient(225deg, #022c22 0%, #064e3b 15%, #065f46 25%, #047857 38%, #059669 50%, #07C05F 65%, #10B981 78%, #34D399 90%, #6EE7B7 100%);
+  /* 基底渐变：较柔和的对角过渡，动态感交给极光光斑层 */
+  background: linear-gradient(165deg, #03231b 0%, #064e3b 30%, #047857 55%, #0aa06a 78%, #34d399 100%);
 
   &::before {
     content: '';
@@ -836,8 +770,8 @@ onMounted(async () => {
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.06) 0%, transparent 50%),
-      radial-gradient(circle at 80% 50%, rgba(255, 255, 255, 0.04) 0%, transparent 50%);
+    background: radial-gradient(1200px 700px at 18% 30%, rgba(255, 255, 255, 0.05) 0%, transparent 55%),
+      radial-gradient(900px 600px at 82% 72%, rgba(110, 231, 183, 0.08) 0%, transparent 60%);
     pointer-events: none;
   }
 }
@@ -854,200 +788,279 @@ onMounted(async () => {
   contain: strict;
 }
 
-.knowledge-node {
+/* ---------- 晨雾极光背景：光斑 / 光环 / 微光粒子 / 波纹（浅绿主题色系） ---------- */
+
+.aurora-blob {
   position: absolute;
-  width: 40px;
-  height: 40px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.15);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  box-shadow:
-    0 0 15px rgba(255, 255, 255, 0.35),
-    0 0 30px rgba(16, 185, 129, 0.2),
-    inset 0 0 8px rgba(255, 255, 255, 0.1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: nodePulse 5s infinite ease-in-out;
-  will-change: transform, opacity;
+  filter: blur(70px);
+  opacity: 0.55;
+  will-change: transform;
 }
 
-.node-icon {
-  width: 20px;
-  height: 20px;
-  color: rgba(255, 255, 255, 0.9);
+.blob-1 {
+  top: -12%;
+  left: -8%;
+  width: 46vw;
+  height: 46vw;
+  min-width: 420px;
+  min-height: 420px;
+  background: radial-gradient(circle at 35% 35%, rgba(110, 231, 183, 0.5) 0%, rgba(16, 185, 129, 0.22) 45%, transparent 70%);
+  animation: blobDrift1 26s ease-in-out infinite alternate;
 }
 
-.node-1 {
-  top: 15%;
-  left: 20%;
-  animation-delay: 0s;
+.blob-2 {
+  top: 18%;
+  right: -10%;
+  width: 38vw;
+  height: 38vw;
+  min-width: 360px;
+  min-height: 360px;
+  background: radial-gradient(circle at 60% 40%, rgba(52, 211, 153, 0.42) 0%, rgba(7, 192, 95, 0.16) 50%, transparent 72%);
+  animation: blobDrift2 31s ease-in-out infinite alternate;
 }
 
-.node-2 {
-  top: 25%;
-  left: 35%;
-  animation-delay: 0.5s;
+.blob-3 {
+  bottom: -18%;
+  left: 22%;
+  width: 42vw;
+  height: 42vw;
+  min-width: 380px;
+  min-height: 380px;
+  background: radial-gradient(circle at 45% 55%, rgba(167, 243, 208, 0.38) 0%, rgba(52, 211, 153, 0.16) 50%, transparent 74%);
+  animation: blobDrift3 24s ease-in-out infinite alternate;
 }
 
-.node-3 {
-  top: 20%;
-  left: 55%;
-  animation-delay: 1s;
-}
-
-.node-4 {
-  top: 30%;
-  left: 75%;
-  animation-delay: 1.5s;
-}
-
-.node-5 {
-  top: 45%;
-  left: 25%;
-  animation-delay: 2s;
-}
-
-.node-6 {
-  top: 50%;
-  left: 45%;
-  animation-delay: 2.5s;
-}
-
-.node-7 {
-  top: 48%;
-  left: 65%;
-  animation-delay: 3s;
-}
-
-.node-8 {
-  top: 60%;
-  left: 20%;
-  animation-delay: 0.3s;
-}
-
-.node-9 {
-  top: 12%;
-  right: 15%;
-  animation-delay: 1.8s;
-}
-
-.node-10 {
+.blob-4 {
   top: 38%;
-  right: 10%;
-  animation-delay: 2.3s;
+  left: 38%;
+  width: 26vw;
+  height: 26vw;
+  min-width: 260px;
+  min-height: 260px;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.16) 0%, rgba(110, 231, 183, 0.14) 45%, transparent 70%);
+  animation: blobDrift1 37s ease-in-out infinite alternate-reverse;
 }
 
-.node-11 {
-  top: 70%;
-  left: 40%;
-  animation-delay: 0.8s;
-}
+@keyframes blobDrift1 {
 
-.node-12 {
-  top: 65%;
-  left: 80%;
-  animation-delay: 1.3s;
-}
-
-@keyframes nodePulse {
-
-  0%,
-  100% {
-    transform: scale(1);
-    opacity: 0.65;
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
   }
 
   50% {
-    transform: scale(1.08);
-    opacity: 0.9;
-  }
-}
-
-.knowledge-lines {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0.35;
-}
-
-.connection-line {
-  stroke: rgba(255, 255, 255, 0.5);
-  stroke-width: 1.5;
-  stroke-dasharray: 6, 3;
-  stroke-linecap: round;
-  animation: lineFlow 10s infinite linear;
-  will-change: stroke-dashoffset;
-}
-
-.line-1 {
-  animation-delay: 0s;
-}
-
-.line-2 {
-  animation-delay: 0.5s;
-}
-
-.line-3 {
-  animation-delay: 1s;
-}
-
-.line-4 {
-  animation-delay: 0.3s;
-}
-
-.line-5 {
-  animation-delay: 0.8s;
-}
-
-.line-6 {
-  animation-delay: 1.3s;
-}
-
-.line-7 {
-  animation-delay: 1.8s;
-}
-
-.line-8 {
-  animation-delay: 2.3s;
-}
-
-.line-9 {
-  animation-delay: 0.2s;
-}
-
-.line-10 {
-  animation-delay: 0.7s;
-}
-
-.line-11 {
-  animation-delay: 0.9s;
-}
-
-.line-12 {
-  animation-delay: 1.5s;
-}
-
-@keyframes lineFlow {
-  0% {
-    stroke-dashoffset: 0;
+    transform: translate3d(6vw, 4vh, 0) scale(1.12);
   }
 
   100% {
-    stroke-dashoffset: 18;
+    transform: translate3d(-3vw, 7vh, 0) scale(0.94);
+  }
+}
+
+@keyframes blobDrift2 {
+
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(-5vw, -4vh, 0) scale(0.92);
+  }
+
+  100% {
+    transform: translate3d(3vw, 6vh, 0) scale(1.1);
+  }
+}
+
+@keyframes blobDrift3 {
+
+  0% {
+    transform: translate3d(0, 0, 0) scale(1.05);
+  }
+
+  50% {
+    transform: translate3d(4vw, -6vh, 0) scale(0.95);
+  }
+
+  100% {
+    transform: translate3d(-4vw, -2vh, 0) scale(1.1);
+  }
+}
+
+/* 旋转光环：conic 渐变亮弧沿细圆环扫过 */
+.glow-ring {
+  position: absolute;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0deg, transparent 290deg, rgba(167, 243, 208, 0.5) 330deg, rgba(255, 255, 255, 0.65) 355deg, transparent 360deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
+  opacity: 0.7;
+  animation: ringSpin 22s linear infinite;
+  will-change: transform;
+}
+
+.ring-1 {
+  top: 10%;
+  left: 12%;
+  width: 380px;
+  height: 380px;
+}
+
+.ring-2 {
+  right: 10%;
+  bottom: 16%;
+  width: 260px;
+  height: 260px;
+  opacity: 0.55;
+  animation-duration: 30s;
+  animation-direction: reverse;
+}
+
+@keyframes ringSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 微光粒子：萤火般上浮闪烁 */
+.firefly {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(209, 250, 229, 0.85);
+  box-shadow:
+    0 0 10px rgba(110, 231, 183, 0.9),
+    0 0 22px rgba(52, 211, 153, 0.5);
+  opacity: 0.6;
+  animation: fireflyFloat 14s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+.dot-1 {
+  top: 22%;
+  left: 18%;
+  animation-duration: 13s;
+}
+
+.dot-2 {
+  top: 64%;
+  left: 28%;
+  animation-delay: -3s;
+  animation-duration: 17s;
+}
+
+.dot-3 {
+  top: 38%;
+  left: 58%;
+  animation-delay: -6s;
+  animation-duration: 12s;
+}
+
+.dot-4 {
+  top: 72%;
+  left: 66%;
+  animation-delay: -9s;
+  animation-duration: 18s;
+}
+
+.dot-5 {
+  top: 18%;
+  left: 72%;
+  animation-delay: -2s;
+  animation-duration: 15s;
+}
+
+.dot-6 {
+  top: 52%;
+  left: 84%;
+  animation-delay: -7s;
+  animation-duration: 14s;
+}
+
+.dot-7 {
+  top: 82%;
+  left: 46%;
+  animation-delay: -5s;
+  animation-duration: 16s;
+}
+
+.dot-8 {
+  top: 34%;
+  left: 8%;
+  animation-delay: -11s;
+  animation-duration: 19s;
+}
+
+@keyframes fireflyFloat {
+
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+    opacity: 0.25;
+  }
+
+  25% {
+    opacity: 0.85;
+  }
+
+  50% {
+    transform: translate3d(24px, -38px, 0);
+    opacity: 0.95;
+  }
+
+  75% {
+    opacity: 0.5;
+  }
+}
+
+/* 底部层叠波纹：双层剪影横向缓移 */
+.bg-waves {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: clamp(120px, 18vh, 220px);
+  opacity: 0.6;
+}
+
+.wave {
+  will-change: transform;
+}
+
+.wave-1 {
+  fill: rgba(255, 255, 255, 0.07);
+  animation: waveDrift 18s ease-in-out infinite alternate;
+}
+
+.wave-2 {
+  fill: rgba(110, 231, 183, 0.1);
+  animation: waveDrift 23s ease-in-out infinite alternate-reverse;
+}
+
+@keyframes waveDrift {
+
+  from {
+    transform: translateX(-2.5%);
+  }
+
+  to {
+    transform: translateX(2.5%);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .knowledge-node {
-    animation: none;
-    opacity: 0.65;
+
+  .aurora-blob,
+  .glow-ring,
+  .firefly,
+  .wave {
+    animation: none !important;
   }
 
-  .connection-line {
-    animation: none;
+  .firefly {
+    opacity: 0.4;
   }
 }
 
@@ -1625,11 +1638,9 @@ onMounted(async () => {
 
 /* Responsive Design */
 @media (max-width: 1024px) {
-  .knowledge-node:nth-of-type(n + 13) {
-    display: none;
-  }
-
-  .connection-line:nth-of-type(n + 13) {
+  /* 小屏精简：隐藏光环与单个光斑，降低视觉密度 */
+  .glow-ring,
+  .blob-4 {
     display: none;
   }
 
@@ -1667,11 +1678,12 @@ onMounted(async () => {
     flex-direction: column;
   }
 
-  .knowledge-node:nth-of-type(n + 9) {
-    display: none;
-  }
-
-  .connection-line:nth-of-type(n + 9) {
+  /* 移动端进一步精简：保留两个光斑 + 四颗粒子 */
+  .blob-3,
+  .dot-5,
+  .dot-6,
+  .dot-7,
+  .dot-8 {
     display: none;
   }
 
@@ -1790,12 +1802,7 @@ onMounted(async () => {
 
 @media (prefers-reduced-motion: reduce) {
 
-  .knowledge-node,
-  .connection-line {
-    animation: none !important;
-    transition: none !important;
-  }
-
+  /* 动态层整体关闭，仅保留静态基底渐变 */
   .animated-bg {
     display: none;
   }
@@ -1805,17 +1812,20 @@ onMounted(async () => {
 <style lang="less">
 html[theme-mode="dark"] {
   .login-layout {
-    background: linear-gradient(225deg, #011a14 0%, #032e22 15%, #043a2c 25%, #05503d 38%, #046647 50%, #038a56 65%, #049b60 78%, #06a06a 90%, #07b074 100%);
+    background: linear-gradient(165deg, #011a14 0%, #032e22 30%, #05503d 60%, #07b074 100%);
   }
 
-  .knowledge-node {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.15);
+  /* 暗色主题：光斑与粒子整体压暗，避免喧宾夺主 */
+  .aurora-blob {
+    opacity: 0.4;
   }
 
-  .connection-line {
-    stroke: rgba(255, 255, 255, 0.25);
+  .firefly {
+    background: rgba(167, 243, 208, 0.7);
+  }
+
+  .wave-1 {
+    fill: rgba(255, 255, 255, 0.05);
   }
 
   .header-logo .logo-image {
