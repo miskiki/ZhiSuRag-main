@@ -7,11 +7,17 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import SpotlightGuide from '@/components/SpotlightGuide.vue'
 import { GLOBAL_USER_GUIDE_KEY, OPEN_NEW_USER_GUIDE_EVENT } from '@/config/contextualGuides'
+import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import type { SpotlightGuideStep } from '@/types/spotlightGuide'
 
 const uiStore = useUIStore()
+const authStore = useAuthStore()
 let settingsOpenedByGuide = false
+
+// 权限收口（v2.9）后模型写配置仅系统管理员可见，其余角色模型页为只读，
+// 引导文案与高亮目标需按角色区分（只收"写"不收"读"，models 页所有人可看）。
+const canManageModels = computed(() => authStore.isSystemAdmin)
 
 const steps = computed<SpotlightGuideStep[]>(() => [
   { key: 'welcome' },
@@ -41,8 +47,10 @@ const steps = computed<SpotlightGuideStep[]>(() => [
     before: () => uiStore.expandSidebar(),
   },
   {
-    key: 'models',
-    target: '[data-guide="settings-add-model"], [data-guide="settings-models"]',
+    key: canManageModels.value ? 'models' : 'modelsReadOnly',
+    target: canManageModels.value
+      ? '[data-guide="settings-add-model"], [data-guide="settings-models"]'
+      : '[data-guide="settings-models"]',
     placement: 'left',
     before: () => {
       uiStore.openSettings('models')
@@ -67,7 +75,8 @@ const onFinish = () => {
 }
 
 const onStepChange = ({ toKey }: { toKey: string }) => {
-  if (toKey !== 'models') {
+  // models（系统管理员）与 modelsReadOnly（其他角色）步骤都会打开设置页
+  if (toKey !== 'models' && toKey !== 'modelsReadOnly') {
     closeGuideSettings()
   }
 }

@@ -11,6 +11,7 @@ import {
   isGlobalUserGuideDone,
   markContextualGuideDone,
 } from '@/config/contextualGuides'
+import { useAuthStore } from '@/stores/auth'
 import { useUIStore } from '@/stores/ui'
 import type { SpotlightGuideStep } from '@/types/spotlightGuide'
 
@@ -23,11 +24,17 @@ const props = withDefaults(
   { variant: 'documentKb' },
 )
 
-const stepI18nPrefix = computed(() =>
-  props.variant === 'agent'
+const authStore = useAuthStore()
+// 权限收口（v2.9）后「添加模型」仅系统管理员可操作；其余角色模型页只读，
+// 引导文案改为"联系系统管理员接入"，不再指导点击不存在的「添加模型」按钮。
+const canManageModels = computed(() => authStore.isSystemAdmin)
+
+const stepI18nPrefix = computed(() => {
+  if (!canManageModels.value) return 'contextualGuide.tenantModels.stepsNoPermission'
+  return props.variant === 'agent'
     ? 'contextualGuide.tenantModels.stepsAgent'
-    : 'contextualGuide.tenantModels.steps',
-)
+    : 'contextualGuide.tenantModels.steps'
+})
 
 const uiStore = useUIStore()
 const active = ref(false)

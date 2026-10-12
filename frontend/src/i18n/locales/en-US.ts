@@ -86,6 +86,10 @@
         title: 'Configure your models',
         desc: 'A key step: add chat, embedding and other models in Model Management so knowledge bases and chat can work. Click "Add model" to get started.'
       },
+      modelsReadOnly: {
+        title: 'Models are managed by system administrators',
+        desc: 'Model access is managed centrally by system administrators. You can select a connected model in knowledge base and chat settings; to add a new one, contact your system administrator.'
+      },
       done: {
         title: 'You are all set',
         desc: 'You now know the essentials — start building your knowledge assistant! Revisit this tour anytime from the help button next to your name in this menu.'
@@ -135,6 +139,20 @@
         done: {
           title: 'Then create an agent',
           desc: 'After saving, close settings and click "Create agent". The wizard covers mode, knowledge bases, and attachment upload options.'
+        }
+      },
+      stepsNoPermission: {
+        intro: {
+          title: 'A chat model is required first',
+          desc: 'Creating an agent requires at least one KnowledgeQA (chat) model. Model access is managed by system administrators, and no model is available in this workspace yet.'
+        },
+        addModel: {
+          title: 'Model management (read-only)',
+          desc: 'This page shows the connected models only; to add one, please contact your system administrator.'
+        },
+        done: {
+          title: 'Continue after models are connected',
+          desc: 'Once your system administrator connects a model, you can come back here to create an agent.'
         }
       }
     },
