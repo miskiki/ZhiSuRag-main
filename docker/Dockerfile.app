@@ -98,7 +98,15 @@ RUN if [ -n "$APK_MIRROR_ARG" ]; then \
         ffmpeg && \
     python3 -m pip install --break-system-packages --upgrade pip setuptools wheel && \
     mkdir -p /home/appuser/.local/bin && \
-    curl -LsSf https://astral.sh/uv/install.sh | CARGO_HOME=/home/appuser/.cargo UV_INSTALL_DIR=/home/appuser/.local/bin sh && \
+    if [ -f "/app/packages/uv-x86_64-unknown-linux-gnu.tar.gz" ]; then \
+        echo "发现本地uv安装包，将进行离线安装"; \
+        tar -xzf /app/packages/uv-x86_64-unknown-linux-gnu.tar.gz -C /tmp && \
+        cp /tmp/uv-x86_64-unknown-linux-gnu/uv /tmp/uv-x86_64-unknown-linux-gnu/uvx /home/appuser/.local/bin/ && \
+        rm -rf /tmp/uv-x86_64-unknown-linux-gnu; \
+    else \
+        echo "未发现本地uv安装包，将进行在线安装"; \
+        curl -LsSf https://astral.sh/uv/install.sh | CARGO_HOME=/home/appuser/.cargo UV_INSTALL_DIR=/home/appuser/.local/bin sh; \
+    fi && \
     chown -R appuser:appuser /home/appuser && \
     ln -sf /home/appuser/.local/bin/uvx /usr/local/bin/uvx && \
     chmod +x /usr/local/bin/uvx && \
