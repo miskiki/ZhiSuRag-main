@@ -1576,6 +1576,18 @@ func initNeo4jClient() (neo4j.Driver, error) {
 }
 
 func NewDuckDB() (*sql.DB, error) {
+	// ZHISHU_DISABLE_DUCKDB=1 skips DuckDB entirely (returns nil handle).
+	// Needed on Windows Lite builds where the prebuilt DuckDB static library is
+	// not ABI-compatible with the local MinGW runtime and crashes the process
+	// at open time. The data-analysis agent tool degrades gracefully (see
+	// DataAnalysisTool.ensureDB). Default behaviour is unchanged.
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("ZHISHU_DISABLE_DUCKDB"))) {
+	case "1", "true", "yes", "on":
+		logger.Infof(context.Background(),
+			"[DuckDB] Disabled by ZHISHU_DISABLE_DUCKDB; agent data-analysis tool will report unavailability")
+		return nil, nil
+	}
+
 	sqlDB, err := sql.Open("duckdb", ":memory:")
 	if err != nil {
 		return nil, fmt.Errorf("failed to open duckdb: %w", err)

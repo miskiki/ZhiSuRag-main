@@ -3,15 +3,44 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 const desktopPrefsFileName = "desktop-prefs.json"
 
 type desktopPrefs struct {
-	HTTPPort       int  `json:"http_port"`
-	HTTPBindPublic bool `json:"http_bind_public"`
+	HTTPPort       int    `json:"http_port"`
+	HTTPBindPublic bool   `json:"http_bind_public"`
+	Mode           string `json:"mode"`       // "", "local", "remote"
+	ServerURL      string `json:"server_url"` // remote mode backend base URL, e.g. http://192.168.1.10:8080
+}
+
+// NormalizeServerURL cleans a user-entered server address: adds http:// when
+// the scheme is missing, strips a trailing slash and any /api/v1 suffix so
+// users can paste either the root or an API URL.
+func NormalizeServerURL(raw string) string {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return ""
+	}
+	if !strings.Contains(trimmed, "://") {
+		trimmed = "http://" + trimmed
+	}
+	u, err := url.Parse(trimmed)
+	if err != nil || u.Host == "" {
+		return ""
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return ""
+	}
+	u.Path = strings.TrimSuffix(u.Path, "/")
+	u.Path = strings.TrimSuffix(u.Path, "/api/v1")
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
 }
 
 func desktopPrefsDir() (string, error) {
@@ -90,4 +119,38 @@ func SaveDesktopHTTPBindPublicPreference(v bool) error {
 	cur := loadDesktopPrefs()
 	cur.HTTPBindPublic = v
 	return saveDesktopPrefs(cur)
+}
+
+// SaveDesktopServerConfig persists the run mode ("local" / "remote") and, for
+// remote mode, the backend base URL. mode "" clears the saved choice so the
+// next launch shows the setup page again.
+func SaveDesktopServerConfig(mode, serverURL string) error {
+	if mode != "local" && mode != "remote" && mode != "" {
+		return fmt.Errorf("invalid mode")
+	}
+	cur := loadDesktopPrefs()
+	cur.Mode = mode
+	switch mode {
+	case "remote":
+		normalized := NormalizeServerURL(serverURL)
+		if normalized == "" {
+			return fmt.Errorf("服务器地址无效")
+		}
+		cur.ServerURL = normalized
+	case "local":
+		cur.ServerURL = ""
+	}
+	return saveDesktopPrefs(cur)
+}
+
+func loadDesktopMode() string {
+	mode := strings.TrimSpace(loadDesktopPrefs().Mode)
+	if mode != "local" && mode != "remote" {
+		return ""
+	}
+	return mode
+}
+
+func loadDesktopServerURL() string {
+	return NormalizeServerURL(loadDesktopPrefs().ServerURL)
 }

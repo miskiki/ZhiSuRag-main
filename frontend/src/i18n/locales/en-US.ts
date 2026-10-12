@@ -2079,6 +2079,7 @@
     haveAccount: 'Already have an account?',
     backToLogin: 'Back to Login',
     loginHint: 'Sign in to continue, or create an account below if this is your first time.',
+    rememberPassword: 'Remember password',
     firstTime: 'New to ZhiShu?',
     registerSuccess: 'Registration successful. Please sign in',
     registerFailed: 'Registration failed',

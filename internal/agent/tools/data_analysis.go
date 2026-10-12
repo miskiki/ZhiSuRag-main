@@ -203,9 +203,21 @@ func (t *DataAnalysisTool) Cleanup(ctx context.Context) {
 	t.createdTables = nil
 }
 
+// ensureDB guards against runtimes where DuckDB is disabled or failed to
+// initialize (e.g. Windows Lite builds without a compatible DuckDB runtime).
+func (t *DataAnalysisTool) ensureDB() error {
+	if t.db == nil {
+		return fmt.Errorf("DuckDB is not available in this runtime; data analysis is disabled")
+	}
+	return nil
+}
+
 // Execute executes the SQL query on DuckDB (only read-only queries are allowed)
 func (t *DataAnalysisTool) Execute(ctx context.Context, args json.RawMessage) (*types.ToolResult, error) {
 	logger.Infof(ctx, "[Tool][DataAnalysis] Execute started for session: %s", t.sessionID)
+	if err := t.ensureDB(); err != nil {
+		return &types.ToolResult{Success: false, Error: err.Error()}, err
+	}
 	var input DataAnalysisInput
 	if err := json.Unmarshal(args, &input); err != nil {
 		logger.Errorf(ctx, "[Tool][DataAnalysis] Failed to parse input args: %v", err)
@@ -415,6 +427,9 @@ type ColumnInfo struct {
 //   - error: any error that occurred during the operation
 func (t *DataAnalysisTool) LoadFromCSV(ctx context.Context, filename string, tableName string) (*TableSchema, error) {
 	logger.Infof(ctx, "[Tool][DataAnalysis] Loading CSV file '%s' into table '%s' for session %s", filename, tableName, t.sessionID)
+	if err := t.ensureDB(); err != nil {
+		return nil, err
+	}
 
 	// Record the created table for cleanup. If already exists, skip creation
 	if t.recordCreatedTable(tableName) {
@@ -461,6 +476,9 @@ func (t *DataAnalysisTool) LoadFromCSV(ctx context.Context, filename string, tab
 // 'spatial' extension (for st_read_meta used to enumerate sheets).
 func (t *DataAnalysisTool) LoadFromExcel(ctx context.Context, filename string, tableName string) (*TableSchema, error) {
 	logger.Infof(ctx, "[Tool][DataAnalysis] Loading Excel file '%s' into table '%s' for session %s", filename, tableName, t.sessionID)
+	if err := t.ensureDB(); err != nil {
+		return nil, err
+	}
 
 	// Record the created table for cleanup. If already exists, skip creation.
 	if t.recordCreatedTable(tableName) {
@@ -585,6 +603,9 @@ func buildExcelCreateTableSQL(tableName, filename string, sheetNames []string) s
 func (t *DataAnalysisTool) LoadFromKnowledge(ctx context.Context, knowledge *types.Knowledge) (*TableSchema, error) {
 	if knowledge == nil {
 		return nil, fmt.Errorf("knowledge cannot be nil")
+	}
+	if err := t.ensureDB(); err != nil {
+		return nil, err
 	}
 	tableName := t.TableName(knowledge)
 

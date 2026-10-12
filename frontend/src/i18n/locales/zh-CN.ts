@@ -4498,6 +4498,7 @@
     haveAccount: '已有账户？',
     backToLogin: '返回登录',
     loginHint: '登录以继续使用；首次使用请在下方创建账户。',
+    rememberPassword: '记住密码',
     firstTime: '首次使用智枢？',
     registerSuccess: '注册成功，请登录',
     registerFailed: '注册失败',

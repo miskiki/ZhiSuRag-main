@@ -75,3 +75,6 @@ miniprogram/project.private.config.json
 
 # Staging dir for the Docker sandbox self-check probe (removed after each run)
 .weknora-sandbox-check-*
+
+# Windows 版本资源由 go-winres 生成（scripts/package-windows.sh）
+cmd/desktop/*.syso

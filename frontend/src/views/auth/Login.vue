@@ -126,6 +126,12 @@
                   autocomplete="current-password" size="large" :disabled="loading" @enter="handleLogin" />
               </t-form-item>
 
+              <div class="remember-row">
+                <t-checkbox v-model="rememberPassword" :disabled="loading">
+                  {{ $t('auth.rememberPassword') }}
+                </t-checkbox>
+              </div>
+
               <t-button type="submit" theme="primary" size="large" block :loading="loading" class="submit-button">
                 {{ loading ? $t('auth.loggingIn') : $t('auth.login') }}
               </t-button>
@@ -368,6 +374,53 @@ const formData = reactive<{ [key: string]: any }>({
   password: '',
 })
 
+// ── 记住密码（remember password）──────────────────────────────────────────
+// 勾选后登录成功，把邮箱/密码存入 localStorage（base64 轻度混淆，非加密），
+// 下次打开登录页自动回填，用户直接点「登录」即可。取消勾选并登录成功即清除。
+const REMEMBERED_CREDENTIALS_KEY = 'zhishu_remembered_credentials'
+const rememberPassword = ref(false)
+
+function encodeRemembered(value: string): string {
+  // btoa 仅接受 Latin1，包一层 encodeURIComponent 以兼容任意字符
+  return btoa(encodeURIComponent(value))
+}
+
+function decodeRemembered(value: string): string {
+  return decodeURIComponent(atob(value))
+}
+
+function loadRememberedCredentials() {
+  try {
+    const raw = localStorage.getItem(REMEMBERED_CREDENTIALS_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    if (saved && saved.email && saved.password) {
+      formData.email = decodeRemembered(saved.email)
+      formData.password = decodeRemembered(saved.password)
+      rememberPassword.value = true
+    }
+  } catch {
+    // 存储损坏时静默忽略，按未记住处理
+    localStorage.removeItem(REMEMBERED_CREDENTIALS_KEY)
+  }
+}
+
+function persistRememberedCredentials() {
+  try {
+    if (rememberPassword.value && formData.email && formData.password) {
+      localStorage.setItem(REMEMBERED_CREDENTIALS_KEY, JSON.stringify({
+        email: encodeRemembered(formData.email),
+        password: encodeRemembered(formData.password),
+        saved_at: Date.now(),
+      }))
+    } else {
+      localStorage.removeItem(REMEMBERED_CREDENTIALS_KEY)
+    }
+  } catch {
+    // 隐私模式下 localStorage 可能不可用，忽略
+  }
+}
+
 // Register form data
 const registerData = reactive<{ [key: string]: any }>({
   username: '',
@@ -457,6 +510,7 @@ const handleClickOutside = (event: MouseEvent) => {
 // Add click outside listener
 onMounted(() => {
   document.addEventListener('click', handleClickOutside)
+  loadRememberedCredentials()
 })
 
 onBeforeUnmount(() => {
@@ -607,6 +661,7 @@ const handleLogin = async () => {
         return
       }
       await persistLoginResponse(response)
+      persistRememberedCredentials()
       notifyLoginSuccess(response, t, tm, formatRole, roleIcon)
     } else {
       MessagePlugin.error(response.message || t('auth.loginError'))
@@ -1519,6 +1574,17 @@ onMounted(async () => {
 
   :deep(.t-form-item__control) {
     width: 100%;
+  }
+}
+
+.remember-row {
+  display: flex;
+  align-items: center;
+  margin: -4px 0 12px;
+
+  :deep(.t-checkbox__label) {
+    font-size: 13px;
+    color: var(--td-text-color-secondary, #666);
   }
 }
 

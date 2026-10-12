@@ -1,0 +1,23 @@
+{
+	"fixed": {
+		"file_version": "0.7.2.0"
+	},
+	"info": {
+		"0804": {
+			"ProductVersion": "0.7.2",
+			"CompanyName": "智述 Lite",
+			"FileDescription": "智述 Lite 桌面客户端（本机模式 / 连接服务器）",
+			"LegalCopyright": "Copyright 2026 智述",
+			"ProductName": "智述 Lite",
+			"Comments": "智述 Lite - Windows 桌面客户端"
+		},
+		"0409": {
+			"ProductVersion": "0.7.2",
+			"CompanyName": "ZhiShu Lite",
+			"FileDescription": "ZhiShu Lite Desktop Client (local mode / connect to server)",
+			"LegalCopyright": "Copyright 2026 ZhiShu",
+			"ProductName": "ZhiShu Lite",
+			"Comments": "ZhiShu Lite - Windows Desktop Client"
+		}
+	}
+}

@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	goruntime "runtime"
 	"strconv"
 	"strings"
 	"syscall"
@@ -34,7 +35,7 @@ import (
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// dragHandlerJS is injected into the webview on DomReady.
+// dragHandlerJS is injected into the webview on DomReady (macOS only).
 // It bypasses Wails' built-in CSS-variable-based drag detection (which uses
 // getComputedStyle and has timing/inheritance issues with dynamic SPA content)
 // and instead uses robust DOM-traversal via el.closest() plus a Y-position
@@ -140,9 +141,16 @@ window.open=function(url){
 })();`
 
 // wailsThemeSyncJS：与 index.html 首屏一致，在 DomReady 再跑一遍，覆盖 Ctrl+R 后 runtime 就绪时机
-const wailsThemeSyncJS = `(function(){try{var t=localStorage.getItem('WeKnora_theme')||'light';if(t==='system')t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var bg=t==='dark'?'#181818':'#eee';document.documentElement.setAttribute('theme-mode',t);document.documentElement.style.background=bg;document.documentElement.style.minHeight='100%';document.documentElement.style.colorScheme=t==='dark'?'dark':'light';if(document.body){document.body.style.background=bg;document.body.style.minHeight='100%';}var w=window.runtime;if(!w)return;if(t==='dark'){if(w.WindowSetDarkTheme)w.WindowSetDarkTheme();if(w.WindowSetBackgroundColour)w.WindowSetBackgroundColour(24,24,24,255);}else{if(w.WindowSetLightTheme)w.WindowSetLightTheme();if(w.WindowSetBackgroundColour)w.WindowSetBackgroundColour(238,238,238,255);}}catch(e){}})()`
+const wailsThemeSyncJS = `(function(){try{var t=localStorage.getItem('WeKnora_theme')||'light';if(t==='system')t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var bg=t==='dark'?'#181818':'#eee';document.documentElement.setAttribute('theme-mode',t);document.documentElement.style.background=bg;document.documentElement.style.minHeight='100%';document.documentElement.colorScheme=t==='dark'?'dark':'light';if(document.body){document.body.style.background=bg;document.body.style.minHeight='100%';}var w=window.runtime;if(!w)return;if(t==='dark'){if(w.WindowSetDarkTheme)w.WindowSetDarkTheme();if(w.WindowSetBackgroundColour)w.WindowSetBackgroundColour(24,24,24,255);}else{if(w.WindowSetLightTheme)w.WindowSetLightTheme();if(w.WindowSetBackgroundColour)w.WindowSetBackgroundColour(238,238,238,255);}}catch(e){}})()`
 
 const weknoraGitHubRepoURL = "https://github.com/Tencent/WeKnora"
+
+// desktopModes for the app shell.
+const (
+	modeUnset  = ""       // show setup page (first run or broken config)
+	modeLocal  = "local"  // embedded backend, data on this machine
+	modeRemote = "remote" // proxy to a user-configured ZhiShu server
+)
 
 func main() {
 	// For macOS .app bundle, the working directory is usually "/" or the MacOS folder.
@@ -157,13 +165,24 @@ func main() {
 		repoRoot := filepath.Clean(filepath.Join("..", ".."))
 		if _, err := os.Stat(filepath.Join(repoRoot, "config", "config.yaml")); err == nil {
 			_ = os.Chdir(repoRoot)
+		} else if exeDir := filepath.Dir(execPath); errPath == nil {
+			// Packaged Windows build: config/ ships next to the exe.
+			if _, err := os.Stat(filepath.Join(exeDir, "config", "config.yaml")); err == nil {
+				_ = os.Chdir(exeDir)
+			}
 		}
 	}
 
 	// Load .env explicitly for the desktop app so DB_DRIVER gets loaded
 	_ = godotenv.Load()
-	configureDesktopStorage(execPath)
 	logger.ConfigureFromEnv()
+
+	// Determine run mode: "" -> setup page, "local" -> embedded backend,
+	// "remote" -> reverse proxy to the configured server.
+	mode := loadDesktopMode()
+	if mode == modeRemote && loadDesktopServerURL() == "" {
+		mode = modeUnset // broken config, fall back to setup
+	}
 
 	// Set Gin mode
 	if os.Getenv("GIN_MODE") == "release" {
@@ -171,95 +190,246 @@ func main() {
 	} else {
 		gin.SetMode(gin.DebugMode)
 	}
-	// Mute Gin's per-route registration spam; replaced by a single
-	// summary printed after router build.
-	runtime.SilenceGinRouteSpam()
-	runtime.LogStartupEnv(context.Background())
-
-	// Build dependency injection container
-	c := container.BuildContainer(runtime.GetContainer())
 
 	// Initialize the WeKnora App struct
 	app := NewApp()
 
-	// Error channel to capture server startup errors
+	// Error channel to capture server startup errors (local mode)
 	serverErrCh := make(chan error, 1)
 
-	// Run backend in a separate goroutine
-	go func() {
-		err := c.Invoke(func(
-			cfg *config.Config,
-			router *gin.Engine,
-			resourceCleaner interfaces.ResourceCleaner,
-		) error {
-			server := &http.Server{Handler: router}
+	useGateway := goruntime.GOOS == "windows" && mode != modeUnset
 
-			runtime.LogGinRouteCount(context.Background())
+	var assetHandler http.Handler
 
-			// 127.0.0.1 + saved port from settings (desktop-prefs.json), or :0 for random free port.
-			addr := desktopBackendListenAddr()
+	if !useGateway {
+		switch mode {
+		case modeUnset:
+			// First run / reconfiguration: serve the standalone setup page.
+			assetHandler = http.HandlerFunc(serveDesktopSetup)
 
-			listener, err := listenWithRetry(addr, 10, 300*time.Millisecond)
+		case modeRemote:
+			base := loadDesktopServerURL()
+			app.backendURL = base
+			target, err := url.Parse(base)
 			if err != nil {
-				return fmt.Errorf("failed to start server: %v", err)
+				logger.Fatalf(context.Background(), "Invalid server URL %q: %v", base, err)
 			}
-
-			tcpAddr := listener.Addr().(*net.TCPAddr)
-			port := tcpAddr.Port
-			app.listenPublic = LoadDesktopHTTPBindPublic()
-			// Reverse proxy and webview API calls always use loopback; avoid 0.0.0.0 / [::] as dial target.
-			app.backendURL = fmt.Sprintf("http://127.0.0.1:%d", port)
-			app.apiLanBaseURL = ""
-			if app.listenPublic {
-				if ip := desktopPreferredLANIPv4(); ip != nil {
-					app.apiLanBaseURL = fmt.Sprintf("http://%s:%d/api/v1", ip.String(), port)
-				}
+			proxy := httputil.NewSingleHostReverseProxy(target)
+			proxy.ErrorHandler = func(w http.ResponseWriter, r *http.Request, err error) {
+				logger.Warnf(context.Background(), "Proxy error for %s: %v", r.URL.Path, err)
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.WriteHeader(http.StatusBadGateway)
+				_, _ = w.Write([]byte(`<html><head><meta charset="utf-8"><title>无法连接服务器</title></head>` +
+					`<body style="font-family:'Microsoft YaHei',system-ui,sans-serif;background:#eef7f1;display:flex;` +
+					`align-items:center;justify-content:center;height:96vh;color:#1f2d27;">` +
+					`<div style="text-align:center;"><h2 style="font-weight:600;">暂时无法连接服务器</h2>` +
+					`<p style="color:#6b7f74;">请确认服务器已启动、网络可达，或在菜单「服务器设置…」中检查地址。</p></div></body></html>`))
 			}
+			assetHandler = withDesktopSetupRoute(proxy)
 
-			// Handle graceful shutdown from Wails OnShutdown hook
+		default: // modeLocal (macOS path)
+			configureDesktopStorage(execPath)
+			runtime.SilenceGinRouteSpam()
+			runtime.LogStartupEnv(context.Background())
+
+			// Build dependency injection container
+			c := container.BuildContainer(runtime.GetContainer())
+
+			// Run backend in a separate goroutine
 			go func() {
-				<-app.shutdownCh
-				logger.Infof(context.Background(), "Wails shutting down, stopping Go backend...")
+				err := c.Invoke(func(
+					cfg *config.Config,
+					router *gin.Engine,
+					resourceCleaner interfaces.ResourceCleaner,
+				) error {
+					server := &http.Server{Handler: router}
 
-				listener.Close()
-				shutdownTimeout := cfg.Server.ShutdownTimeout
-				if shutdownTimeout == 0 {
-					shutdownTimeout = 30 * time.Second
-				}
-				shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-				defer cancel()
+					runtime.LogGinRouteCount(context.Background())
 
-				if err := server.Shutdown(shutdownCtx); err != nil {
-					server.Close()
+					// 127.0.0.1 + saved port from settings (desktop-prefs.json), or :0 for random free port.
+					addr := desktopBackendListenAddr()
+
+					listener, err := listenWithRetry(addr, 10, 300*time.Millisecond)
+					if err != nil {
+						return fmt.Errorf("failed to start server: %v", err)
+					}
+
+					tcpAddr := listener.Addr().(*net.TCPAddr)
+					port := tcpAddr.Port
+					app.listenPublic = LoadDesktopHTTPBindPublic()
+					// Reverse proxy and webview API calls always use loopback; avoid 0.0.0.0 / [::] as dial target.
+					app.backendURL = fmt.Sprintf("http://127.0.0.1:%d", port)
+					app.apiLanBaseURL = ""
+					if app.listenPublic {
+						if ip := desktopPreferredLANIPv4(); ip != nil {
+							app.apiLanBaseURL = fmt.Sprintf("http://%s:%d/api/v1", ip.String(), port)
+						}
+					}
+
+					// Handle graceful shutdown from Wails OnShutdown hook
+					go func() {
+						<-app.shutdownCh
+						logger.Infof(context.Background(), "Wails shutting down, stopping Go backend...")
+
+						listener.Close()
+						shutdownTimeout := cfg.Server.ShutdownTimeout
+						if shutdownTimeout == 0 {
+							shutdownTimeout = 30 * time.Second
+						}
+						shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+						defer cancel()
+
+						if err := server.Shutdown(shutdownCtx); err != nil {
+							server.Close()
+						}
+						resourceCleaner.Cleanup(shutdownCtx)
+					}()
+
+					// Also listen for OS signals just in case
+					signals := make(chan os.Signal, 1)
+					signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+					go func() {
+						<-signals
+						app.shutdownCh <- struct{}{} // trigger shutdown
+					}()
+
+					logger.Infof(context.Background(), "Server is running at %s (proxy -> %s)", tcpAddr.String(), app.backendURL)
+					if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+						return fmt.Errorf("server error: %v", err)
+					}
+					return nil
+				})
+
+				if err != nil {
+					serverErrCh <- err
+					logger.Fatalf(context.Background(), "Failed to run backend: %v", err)
 				}
-				resourceCleaner.Cleanup(shutdownCtx)
 			}()
 
-			// Also listen for OS signals just in case
-			signals := make(chan os.Signal, 1)
-			signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
-			go func() {
-				<-signals
-				app.shutdownCh <- struct{}{} // trigger shutdown
-			}()
+			// Give the server a moment to start and determine its port
+			time.Sleep(500 * time.Millisecond)
 
-			logger.Infof(context.Background(), "Server is running at %s (proxy -> %s)", tcpAddr.String(), app.backendURL)
-			if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
-				return fmt.Errorf("server error: %v", err)
-			}
-			return nil
-		})
-
-		if err != nil {
-			serverErrCh <- err
-			logger.Fatalf(context.Background(), "Failed to run backend: %v", err)
+			// Wait for the backend URL to be set
+			targetURL, _ := url.Parse(app.backendURL)
+			proxy := httputil.NewSingleHostReverseProxy(targetURL)
+			assetHandler = withDesktopSetupRoute(proxy)
 		}
-	}()
+	}
 
-	// Give the server a moment to start and determine its port
-	time.Sleep(500 * time.Millisecond)
+	if useGateway {
+		// Windows: the webview must load the UI over real loopback HTTP.
+		// WebView2's virtual-host channel buffers streamed bodies, which
+		// kills chat streaming (SSE) and the retrieval/thinking progress.
+		// See desktopGateway for the details.
+		var target string
+		if mode == modeRemote {
+			target = loadDesktopServerURL()
+			if strings.TrimSpace(target) == "" {
+				mode = modeUnset // broken config, fall back to setup page below
+			}
+		}
+		if mode != modeUnset {
+			if mode == modeLocal {
+				configureDesktopStorage(execPath)
+				runtime.SilenceGinRouteSpam()
+				runtime.LogStartupEnv(context.Background())
 
-	// Create application with options
+				// Build dependency injection container
+				c := container.BuildContainer(runtime.GetContainer())
+
+				// Run backend in a separate goroutine
+				go func() {
+					err := c.Invoke(func(
+						cfg *config.Config,
+						router *gin.Engine,
+						resourceCleaner interfaces.ResourceCleaner,
+					) error {
+						server := &http.Server{Handler: router}
+
+						runtime.LogGinRouteCount(context.Background())
+
+						addr := desktopBackendListenAddr()
+
+						listener, err := listenWithRetry(addr, 10, 300*time.Millisecond)
+						if err != nil {
+							return fmt.Errorf("failed to start server: %v", err)
+						}
+
+						tcpAddr := listener.Addr().(*net.TCPAddr)
+						port := tcpAddr.Port
+						app.listenPublic = LoadDesktopHTTPBindPublic()
+						app.backendURL = fmt.Sprintf("http://127.0.0.1:%d", port)
+						app.apiLanBaseURL = ""
+						if app.listenPublic {
+							if ip := desktopPreferredLANIPv4(); ip != nil {
+								app.apiLanBaseURL = fmt.Sprintf("http://%s:%d/api/v1", ip.String(), port)
+							}
+						}
+
+						// Handle graceful shutdown from Wails OnShutdown hook
+						go func() {
+							<-app.shutdownCh
+							logger.Infof(context.Background(), "Wails shutting down, stopping Go backend...")
+
+							listener.Close()
+							shutdownTimeout := cfg.Server.ShutdownTimeout
+							if shutdownTimeout == 0 {
+								shutdownTimeout = 30 * time.Second
+							}
+							shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+							defer cancel()
+
+							if err := server.Shutdown(shutdownCtx); err != nil {
+								server.Close()
+							}
+							resourceCleaner.Cleanup(shutdownCtx)
+						}()
+
+						// Also listen for OS signals just in case
+						signals := make(chan os.Signal, 1)
+						signal.Notify(signals, syscall.SIGINT, syscall.SIGTERM)
+						go func() {
+							<-signals
+							app.shutdownCh <- struct{}{} // trigger shutdown
+						}()
+
+						logger.Infof(context.Background(), "Server is running at %s (gateway -> %s)", tcpAddr.String(), app.backendURL)
+						if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+							return fmt.Errorf("server error: %v", err)
+						}
+						return nil
+					})
+
+					if err != nil {
+						serverErrCh <- err
+						logger.Fatalf(context.Background(), "Failed to run backend: %v", err)
+					}
+				}()
+
+				// Wait for the embedded backend to pick its port.
+				deadline := time.Now().Add(8 * time.Second)
+				for strings.TrimSpace(app.backendURL) == "" {
+					if time.Now().After(deadline) {
+						logger.Fatalf(context.Background(), "Embedded backend did not start in time")
+					}
+					time.Sleep(50 * time.Millisecond)
+				}
+				target = app.backendURL
+			}
+
+			gateway, err := startDesktopGateway(app, target)
+			if err != nil {
+				logger.Fatalf(context.Background(), "Failed to start desktop gateway: %v", err)
+			}
+			logger.Infof(context.Background(), "Desktop gateway: %s (target -> %s)", gateway.baseURL, target)
+			assetHandler = gateway.bootstrapHandler()
+		}
+		if mode == modeUnset {
+			assetHandler = http.HandlerFunc(serveDesktopSetup)
+		}
+	}
+
+	// Create application menu
 	// macOS app menu
 	AppMenu := menu.NewMenu()
 	FileMenu := AppMenu.AddSubmenu("ZhiShu Lite")
@@ -282,6 +452,12 @@ func main() {
 			wailsruntime.BrowserOpenURL(app.ctx, weknoraGitHubRepoURL)
 		}
 	})
+	FileMenu.AddText("服务器设置…", nil, func(_ *menu.CallbackData) {
+		if app.ctx == nil {
+			return
+		}
+		wailsruntime.WindowExecJS(app.ctx, fmt.Sprintf("location.href=%s;", strconv.Quote(desktopSetupPath)))
+	})
 	FileMenu.AddText("Check for Updates...", nil, func(_ *menu.CallbackData) {
 		if app.ctx == nil {
 			return
@@ -303,12 +479,9 @@ func main() {
 		}
 	})
 
-	// Wait for the backend URL to be set
-	targetURL, _ := url.Parse(app.backendURL)
-	proxy := httputil.NewSingleHostReverseProxy(targetURL)
-
 	// Start Wails application
-	// We use a Reverse Proxy to seamlessly proxy Wails' frontend to our Go backend
+	// The asset handler is a Reverse Proxy to seamlessly proxy Wails' frontend
+	// to our Go backend (local or remote), or the setup page on first run.
 	err := wails.Run(&options.App{
 		Title:         "ZhiShu Lite",
 		Width:         1280,
@@ -316,23 +489,32 @@ func main() {
 		DisableResize: false,
 		Menu:          AppMenu,
 		AssetServer: &assetserver.Options{
-			Handler: proxy,
+			Handler: assetHandler,
 		},
 		StartHidden: false, // Show window on startup
 		OnStartup:   app.startup,
 		OnDomReady: func(ctx context.Context) {
 			wailsruntime.WindowExecJS(ctx, wailsThemeSyncJS)
-			wailsruntime.WindowExecJS(ctx, dragHandlerJS)
-			// 注入真实 API 根路径（与 window.location.origin 不同）；无 Go 绑定时仍可显示。
-			if u := strings.TrimSpace(app.backendURL); u != "" {
-				apiRoot := strings.TrimRight(u, "/") + "/api/v1"
-				inject := fmt.Sprintf(`try{window.__ZHISHU_API_BASE__=%s}catch(e){}`, strconv.Quote(apiRoot))
-				wailsruntime.WindowExecJS(ctx, inject)
+			if goruntime.GOOS == "darwin" {
+				// macOS keeps the wails:// origin with the Wails runtime, so
+				// the drag regions and API-base injection apply there.
+				wailsruntime.WindowExecJS(ctx, dragHandlerJS)
+				if mode != modeUnset {
+					if u := strings.TrimSpace(app.backendURL); u != "" {
+						apiRoot := strings.TrimRight(u, "/") + "/api/v1"
+						inject := fmt.Sprintf(`try{window.__ZHISHU_API_BASE__=%s}catch(e){}`, strconv.Quote(apiRoot))
+						wailsruntime.WindowExecJS(ctx, inject)
+					}
+					if lan := strings.TrimSpace(app.apiLanBaseURL); lan != "" {
+						injectLan := fmt.Sprintf(`try{window.__ZHISHU_API_LAN_BASE__=%s}catch(e){}`, strconv.Quote(lan))
+						wailsruntime.WindowExecJS(ctx, injectLan)
+					}
+				}
 			}
-			if lan := strings.TrimSpace(app.apiLanBaseURL); lan != "" {
-				injectLan := fmt.Sprintf(`try{window.__ZHISHU_API_LAN_BASE__=%s}catch(e){}`, strconv.Quote(lan))
-				wailsruntime.WindowExecJS(ctx, injectLan)
-			}
+			// Windows non-setup: the desktop gateway injects the desktop
+			// shell and API base server-side into every HTML response — the
+			// webview lives on the gateway's HTTP origin, where Wails
+			// page hooks do not apply.
 		},
 		OnShutdown: app.shutdown,
 		Bind: []interface{}{
@@ -349,9 +531,37 @@ func main() {
 	if err != nil {
 		println("Error:", err.Error())
 	}
+
+	select {
+	case err := <-serverErrCh:
+		_ = err // already logged via logger.Fatalf
+	default:
+	}
+}
+
+// withDesktopSetupRoute serves the desktop setup page at desktopSetupPath in
+// front of the proxied backend, so run mode can be changed at any time from
+// the menu.
+func withDesktopSetupRoute(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == desktopSetupPath {
+			serveDesktopSetup(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func configureDesktopStorage(execPath string) {
+	switch goruntime.GOOS {
+	case "darwin":
+		configureDesktopStorageMac(execPath)
+	case "windows":
+		configureDesktopStorageWindows()
+	}
+}
+
+func configureDesktopStorageMac(execPath string) {
 	if execPath == "" || !strings.Contains(execPath, ".app/Contents/MacOS") {
 		return
 	}
@@ -369,6 +579,26 @@ func configureDesktopStorage(execPath string) {
 	dbPath := resolveDesktopDataPath(os.Getenv("DB_PATH"), filepath.Join("data", "zhishu.db"), appSupportDir)
 	filesPath := resolveDesktopDataPath(os.Getenv("LOCAL_STORAGE_BASE_DIR"), filepath.Join("data", "files"), appSupportDir)
 
+	applyDesktopDataPaths(dbPath, filesPath)
+}
+
+// configureDesktopStorageWindows redirects the SQLite DB and uploaded files to
+// %AppData%\ZhiShu Lite\data so a packaged exe works regardless of CWD.
+func configureDesktopStorageWindows() {
+	cfgDir, err := os.UserConfigDir()
+	if err != nil || cfgDir == "" {
+		logger.Warnf(context.Background(), "Failed to resolve user config dir for desktop storage: %v", err)
+		return
+	}
+	appDir := filepath.Join(cfgDir, "ZhiShu Lite")
+
+	dbPath := resolveDesktopDataPath(os.Getenv("DB_PATH"), filepath.Join("data", "zhishu.db"), appDir)
+	filesPath := resolveDesktopDataPath(os.Getenv("LOCAL_STORAGE_BASE_DIR"), filepath.Join("data", "files"), appDir)
+
+	applyDesktopDataPaths(dbPath, filesPath)
+}
+
+func applyDesktopDataPaths(dbPath, filesPath string) {
 	if err := os.MkdirAll(filepath.Dir(dbPath), 0o755); err != nil {
 		logger.Warnf(context.Background(), "Failed to create desktop DB directory %s: %v", filepath.Dir(dbPath), err)
 	}
@@ -378,6 +608,7 @@ func configureDesktopStorage(execPath string) {
 
 	_ = os.Setenv("DB_PATH", dbPath)
 	_ = os.Setenv("LOCAL_STORAGE_BASE_DIR", filesPath)
+	logger.Infof(context.Background(), "Desktop storage: db=%s files=%s", dbPath, filesPath)
 }
 
 func defaultMacAppSupportDir(execPath string) (string, error) {
@@ -435,8 +666,8 @@ func desktopPreferredLANIPv4() net.IP {
 			if aerr != nil {
 				continue
 			}
-			for _, a := range addrs {
-				ipNet, ok := a.(*net.IPNet)
+			for _, addr := range addrs {
+				ipNet, ok := addr.(*net.IPNet)
 				if !ok || ipNet.IP == nil {
 					continue
 				}
@@ -457,8 +688,8 @@ func desktopPreferredLANIPv4() net.IP {
 			if aerr != nil {
 				continue
 			}
-			for _, a := range addrs {
-				ipNet, ok := a.(*net.IPNet)
+			for _, addr := range addrs {
+				ipNet, ok := addr.(*net.IPNet)
 				if !ok || ipNet.IP == nil {
 					continue
 				}
