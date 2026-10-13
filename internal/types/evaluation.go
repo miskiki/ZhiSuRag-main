@@ -1,6 +1,7 @@
 package types
 
 import (
+	"embed"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -12,10 +13,56 @@ import (
 // Jieba is a global instance of Chinese text segmentation tool
 var Jieba *gojieba.Jieba = newJieba()
 
+// embeddedJiebaDictFS carries the cppjieba dictionaries inside the binary.
+// gojieba's zero-arg NewJieba() resolves dictionaries against paths baked in
+// at COMPILE time (the build machine's Go module cache), so a binary built on
+// a dev machine panics at process init on any other machine ("Dictionary file
+// does not exist: C:/Users/<who>/go/pkg/mod/..."). Embedding the dicts and
+// extracting them to a per-machine directory removes that dependency; the
+// JIEBA_DICT_DIR override keeps precedence for deployments that manage their
+// own dictionaries (e.g. the Docker image pre-copies the module path).
+//
+//go:embed jieba_dict
+var embeddedJiebaDictFS embed.FS
+
+const embeddedJiebaDictDir = "jieba_dict"
+
+var embeddedJiebaDictFiles = []string{
+	"jieba.dict.utf8",
+	"hmm_model.utf8",
+	"user.dict.utf8",
+	"idf.utf8",
+	"stop_words.utf8",
+}
+
+// extractEmbeddedJiebaDict materializes the embedded dictionaries into a
+// per-machine directory (idempotent: existing files are kept). Returns the
+// directory to pass to gojieba.NewJieba.
+func extractEmbeddedJiebaDict() string {
+	dir := filepath.Join(os.TempDir(), "zhishu-jieba-dict")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return dir
+	}
+	for _, name := range embeddedJiebaDictFiles {
+		target := filepath.Join(dir, name)
+		if _, err := os.Stat(target); err == nil {
+			continue
+		}
+		// embed.FS paths are always slash-separated; filepath.Join would
+		// produce backslashes on Windows and ReadFile would silently fail.
+		data, err := embeddedJiebaDictFS.ReadFile(embeddedJiebaDictDir + "/" + name)
+		if err != nil {
+			continue
+		}
+		_ = os.WriteFile(target, data, 0o644)
+	}
+	return dir
+}
+
 func newJieba() *gojieba.Jieba {
 	dictDir := os.Getenv("JIEBA_DICT_DIR")
 	if dictDir == "" {
-		return gojieba.NewJieba()
+		dictDir = extractEmbeddedJiebaDict()
 	}
 
 	return gojieba.NewJieba(
