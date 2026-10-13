@@ -153,6 +153,13 @@ const (
 )
 
 func main() {
+	// Windows 分发诊断：启动黑匣子（写 exe 旁 startup-error.log），同事机器
+	// 上任何静默失败都能留下可回传的痕迹。panic 也会被记录。
+	startupLogInit()
+	defer startupCrashGuard()
+	defer startupLogClose()
+	startupLogf("boot: version=%s os=%s", desktopAboutVersion(), goruntime.GOOS)
+
 	// For macOS .app bundle, the working directory is usually "/" or the MacOS folder.
 	// We need to change the working directory to the Resources folder where our configs are.
 	execPath, errPath := os.Executable()
@@ -422,6 +429,7 @@ func main() {
 				logger.Fatalf(context.Background(), "Failed to start desktop gateway: %v", err)
 			}
 			logger.Infof(context.Background(), "Desktop gateway: %s (target -> %s)", gateway.baseURL, target)
+			startupLogf("gateway ready: %s -> %s", gateway.baseURL, target)
 			assetHandler = gateway.bootstrapHandler()
 		}
 		if mode == modeUnset {
@@ -479,8 +487,14 @@ func main() {
 	// Windows: make sure the WebView2 runtime exists before creating the
 	// window, so a missing runtime produces a friendly Chinese guide instead
 	// of a silent launch failure on colleague machines.
-	if goruntime.GOOS == "windows" && !ensureWebView2Runtime() {
-		os.Exit(1)
+	if goruntime.GOOS == "windows" {
+		startupLogf("mode=%s target=%q webview2=%v", mode, loadDesktopServerURL(), webview2RuntimeInstalled())
+		if !ensureWebView2Runtime() {
+			startupLogf("exit: webview2 runtime missing")
+			startupLogClose()
+			os.Exit(1)
+		}
+		startupLogf("webview2 runtime ok")
 	}
 
 	// Start Wails application
@@ -533,6 +547,8 @@ func main() {
 	})
 
 	if err != nil {
+		startupLogf("wails.Run failed: %v", err)
+		startupLogClose()
 		println("Error:", err.Error())
 	}
 
