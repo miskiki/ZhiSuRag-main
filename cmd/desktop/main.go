@@ -476,6 +476,13 @@ func main() {
 		}
 	})
 
+	// Windows: make sure the WebView2 runtime exists before creating the
+	// window, so a missing runtime produces a friendly Chinese guide instead
+	// of a silent launch failure on colleague machines.
+	if goruntime.GOOS == "windows" && !ensureWebView2Runtime() {
+		os.Exit(1)
+	}
+
 	// Start Wails application
 	// The asset handler is a Reverse Proxy to seamlessly proxy Wails' frontend
 	// to our Go backend (local or remote), or the setup page on first run.
