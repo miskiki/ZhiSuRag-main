@@ -480,7 +480,7 @@ const { t } = useI18n()
 const secretPlaceholder = '***'
 const isMaskedSecret = (value?: string) => value === secretPlaceholder
 
-const clusterGuideUrl = 'https://github.com/Tencent/WeKnora/blob/main/docs/sandbox-cluster.md'
+const clusterGuideUrl = 'https://github.com/miskiki/ZhiSuRag-main/blob/main/docs/sandbox-cluster.md'
 const e2bApiKeysUrl = 'https://e2b.dev/dashboard?tab=keys'
 
 const backendOptions = [...NAMED_SANDBOX_BACKEND_TYPES]

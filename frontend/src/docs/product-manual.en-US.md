@@ -113,4 +113,4 @@ A workspace admin can create an agent and enable an embed channel, then mount th
 Click the **help button** next to your name at the top of the menu.
 
 **Q: More deployment and developer docs?**
-See the project repository [docs directory](https://github.com/Tencent/WeKnora/tree/main/docs).
+See the project repository [docs directory](https://github.com/miskiki/ZhiSuRag-main/tree/main/docs).

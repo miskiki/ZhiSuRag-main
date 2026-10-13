@@ -5,14 +5,14 @@
   "frontend:dir": "../../frontend",
   "wailsjsdir": "../../frontend/src",
   "author": {
-    "name": "WeKnora Team",
+    "name": "智枢文渊",
     "email": ""
   },
   "info": {
-    "companyName": "Tencent",
+    "companyName": "智枢文渊",
     "productName": "ZhiShu Lite",
     "productVersion": "1.0.0",
-    "copyright": "Copyright 2026 Tencent",
+    "copyright": "Copyright 2026 智枢文渊",
     "comments": "WeKnora Desktop Edition"
   },
   "mac": {

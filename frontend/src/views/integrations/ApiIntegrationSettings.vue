@@ -1427,7 +1427,7 @@ const saveDesktopPort = async () => {
 }
 
 function openApiDoc() {
-  window.open('https://github.com/Tencent/WeKnora/blob/main/docs/api/README.md', '_blank')
+  window.open('https://github.com/miskiki/ZhiSuRag-main/blob/main/docs/api/README.md', '_blank')
 }
 
 function openCreateAPIKeyDialog() {

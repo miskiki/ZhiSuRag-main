@@ -440,7 +440,7 @@ func main() {
 		choice, err := wailsruntime.MessageDialog(app.ctx, wailsruntime.MessageDialogOptions{
 			Type:          wailsruntime.InfoDialog,
 			Title:         "ZhiShu Lite",
-			Message:       fmt.Sprintf("ZhiShu Lite — Desktop Edition\n\nA RAG framework for document understanding and semantic Q&A over complex, heterogeneous content.\n\nVersion %s\n© 2026 Tencent\n\nGitHub:\n%s", desktopAboutVersion(), productGitHubRepoURL),
+			Message:       fmt.Sprintf("ZhiShu Lite — Desktop Edition\n\nA RAG framework for document understanding and semantic Q&A over complex, heterogeneous content.\n\nVersion %s\n© 2026 智枢文渊\n\nGitHub:\n%s", desktopAboutVersion(), productGitHubRepoURL),
 			Buttons:       []string{"Open GitHub", "OK"},
 			DefaultButton: "OK",
 		})
@@ -459,10 +459,7 @@ func main() {
 		wailsruntime.WindowExecJS(app.ctx, fmt.Sprintf("location.href=%s;", strconv.Quote(desktopSetupPath)))
 	})
 	FileMenu.AddText("Check for Updates...", nil, func(_ *menu.CallbackData) {
-		if app.ctx == nil {
-			return
-		}
-		checkUpdate(app.ctx, desktopAboutVersion(), true, false)
+		app.CheckForUpdates()
 	})
 	FileMenu.AddSeparator()
 	FileMenu.AddText("Quit", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {

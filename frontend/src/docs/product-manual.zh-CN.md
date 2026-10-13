@@ -113,4 +113,4 @@
 点击左上角菜单顶部昵称旁的**帮助按钮**即可重新打开新手引导。
 
 **Q：更多部署与开发文档？**
-见项目仓库 [docs 目录](https://github.com/Tencent/WeKnora/tree/main/docs)。
+见项目仓库 [docs 目录](https://github.com/miskiki/ZhiSuRag-main/tree/main/docs)。

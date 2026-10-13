@@ -230,7 +230,7 @@ const confirmDelete = useConfirmDelete()
 const authStore = useAuthStore()
 const canManagePlatform = computed(() => authStore.isSystemAdmin)
 
-const sandboxGuideUrl = 'https://github.com/Tencent/WeKnora/blob/main/docs/sandbox-cluster.md'
+const sandboxGuideUrl = 'https://github.com/miskiki/ZhiSuRag-main/blob/main/docs/sandbox-cluster.md'
 
 const backendTypes = NAMED_SANDBOX_BACKEND_TYPES
 
