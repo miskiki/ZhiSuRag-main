@@ -1,0 +1,16 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "ZhiShu Client",
+  "outputfilename": "ZhiShu Client",
+  "author": {
+    "name": "智枢文渊",
+    "email": ""
+  },
+  "info": {
+    "companyName": "智枢文渊",
+    "productName": "ZhiShu Client",
+    "productVersion": "0.7.2",
+    "copyright": "Copyright 2026 智枢文渊",
+    "comments": "智枢文渊客户端（连接服务器模式）"
+  }
+}
