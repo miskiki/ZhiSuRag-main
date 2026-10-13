@@ -143,7 +143,7 @@ window.open=function(url){
 // wailsThemeSyncJS：与 index.html 首屏一致，在 DomReady 再跑一遍，覆盖 Ctrl+R 后 runtime 就绪时机
 const wailsThemeSyncJS = `(function(){try{var t=localStorage.getItem('WeKnora_theme')||'light';if(t==='system')t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';var bg=t==='dark'?'#181818':'#eee';document.documentElement.setAttribute('theme-mode',t);document.documentElement.style.background=bg;document.documentElement.style.minHeight='100%';document.documentElement.colorScheme=t==='dark'?'dark':'light';if(document.body){document.body.style.background=bg;document.body.style.minHeight='100%';}var w=window.runtime;if(!w)return;if(t==='dark'){if(w.WindowSetDarkTheme)w.WindowSetDarkTheme();if(w.WindowSetBackgroundColour)w.WindowSetBackgroundColour(24,24,24,255);}else{if(w.WindowSetLightTheme)w.WindowSetLightTheme();if(w.WindowSetBackgroundColour)w.WindowSetBackgroundColour(238,238,238,255);}}catch(e){}})()`
 
-const weknoraGitHubRepoURL = "https://github.com/Tencent/WeKnora"
+const productGitHubRepoURL = "https://github.com/miskiki/ZhiSuRag-main"
 
 // desktopModes for the app shell.
 const (
@@ -440,7 +440,7 @@ func main() {
 		choice, err := wailsruntime.MessageDialog(app.ctx, wailsruntime.MessageDialogOptions{
 			Type:          wailsruntime.InfoDialog,
 			Title:         "ZhiShu Lite",
-			Message:       fmt.Sprintf("ZhiShu Lite — Desktop Edition\n\nA RAG framework for document understanding and semantic Q&A over complex, heterogeneous content.\n\nVersion %s\n© 2026 Tencent\n\nGitHub:\n%s", desktopAboutVersion(), weknoraGitHubRepoURL),
+			Message:       fmt.Sprintf("ZhiShu Lite — Desktop Edition\n\nA RAG framework for document understanding and semantic Q&A over complex, heterogeneous content.\n\nVersion %s\n© 2026 Tencent\n\nGitHub:\n%s", desktopAboutVersion(), productGitHubRepoURL),
 			Buttons:       []string{"Open GitHub", "OK"},
 			DefaultButton: "OK",
 		})
@@ -449,7 +449,7 @@ func main() {
 			return
 		}
 		if choice == "Open GitHub" {
-			wailsruntime.BrowserOpenURL(app.ctx, weknoraGitHubRepoURL)
+			wailsruntime.BrowserOpenURL(app.ctx, productGitHubRepoURL)
 		}
 	})
 	FileMenu.AddText("服务器设置…", nil, func(_ *menu.CallbackData) {
