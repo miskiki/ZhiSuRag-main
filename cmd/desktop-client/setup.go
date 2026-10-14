@@ -99,7 +99,13 @@ const clientSetupPageHTML = `<!DOCTYPE html>
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ fn: fn, args: args })
-    }).then(function(r){ return r.json(); }).then(function(j){
+    }).then(function(r){
+      var ct = (r.headers.get('Content-Type') || '');
+      if (ct.indexOf('application/json') === -1) {
+        throw '桌面通道未就绪，请关闭窗口后重新打开应用';
+      }
+      return r.json();
+    }).then(function(j){
       if (!j.ok) throw (j.error || 'rpc failed');
       return j.result;
     });
