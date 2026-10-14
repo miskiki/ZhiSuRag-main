@@ -59,7 +59,22 @@ func main() {
 			os.Exit(1)
 		}
 		startupLogf("gateway ready: %s -> %s", gwURL, prefs.ServerURL)
-		assetHandler = app.gateway.bootstrapHandler()
+		// 网关模式下 assetserver 也要能响应：/__client_setup__（菜单入口）
+		// 和 /__desktop__/*（设置页 RPC 兑底），其余路径交给 bootstrap 页。
+		gwMux := http.NewServeMux()
+		gwMux.HandleFunc("/__client_setup__", serveClientSetup)
+		gwMux.HandleFunc("/__desktop__/rpc", app.handleRPC)
+		gwMux.HandleFunc("/__desktop__/save-blob", app.handleSaveBlob)
+		gwMux.HandleFunc("/__desktop__/open", app.handleOpen)
+		gwMux.HandleFunc("/__desktop__/reveal", app.handleReveal)
+		gwMux.HandleFunc("/__desktop__/open-external", app.handleOpenExternal)
+		gwMux.HandleFunc("/__desktop__/ping", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
+			w.Header().Set("Content-Type", "application/json; charset=utf-8")
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+		})
+		gwMux.Handle("/", app.gateway.bootstrapHandler())
+		assetHandler = gwMux
 	}
 
 	// Windows: verify the WebView2 runtime before creating the window.

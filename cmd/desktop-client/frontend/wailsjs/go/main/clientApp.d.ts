@@ -5,6 +5,8 @@ export function ApplyClientSetup(arg1:string):Promise<Record<string, any>>;
 
 export function CheckForUpdates():Promise<void>;
 
+export function GatewayURL():Promise<string>;
+
 export function GetClientSetupState():Promise<Record<string, any>>;
 
 export function OpenFilePath(arg1:string):Promise<boolean>;

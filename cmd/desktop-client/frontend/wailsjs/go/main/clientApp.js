@@ -10,6 +10,10 @@ export function CheckForUpdates() {
   return window['go']['main']['clientApp']['CheckForUpdates']();
 }
 
+export function GatewayURL() {
+  return window['go']['main']['clientApp']['GatewayURL']();
+}
+
 export function GetClientSetupState() {
   return window['go']['main']['clientApp']['GetClientSetupState']();
 }

@@ -132,6 +132,8 @@ func (g *clientGateway) handleDesktopAPI(w http.ResponseWriter, r *http.Request)
 	case "/__desktop__/probe-target":
 		// Bootstrap 探测当前目标服务器是否可达：可达才把 webview 交给
 		// 服务器页面；不可达则引导回设置页（携带 offline 标记）。
+		// 跨域探测（bootstrap 页在 wails 源上），必须带 CORS 头。
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		target := g.currentTarget().String()
 		client := &http.Client{Timeout: 3 * time.Second}
 		resp, err := client.Get(target + "/config.js")

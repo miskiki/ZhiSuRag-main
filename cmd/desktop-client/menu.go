@@ -40,7 +40,12 @@ func buildAppMenu(app *clientApp) *menu.Menu {
 		if app.ctx == nil {
 			return
 		}
-		wailsruntime.WindowExecJS(app.ctx, fmt.Sprintf("location.href=%s;", quoteJS(clientSetupPath)))
+		target := clientSetupPath
+		if gw := app.GatewayURL(); gw != "" {
+			// webview 当前在网关 HTTP 源上，用绝对地址确保可达
+			target = gw + clientSetupPath
+		}
+		wailsruntime.WindowExecJS(app.ctx, fmt.Sprintf("location.href=%s;", quoteJS(target)))
 	})
 
 	FileMenu.AddSeparator()

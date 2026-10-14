@@ -114,6 +114,10 @@ func newClientApp() *clientApp { return &clientApp{} }
 
 func (a *clientApp) startup(ctx context.Context) { a.ctx = ctx }
 
+// GatewayURL returns the loopback gateway base URL (empty before the
+// gateway starts, i.e. when the setup page is showing).
+func (a *clientApp) GatewayURL() string { return a.gatewayURL }
+
 // ensureGateway starts the loopback gateway on first use and (re)points it at
 // targetURL. Reuses the existing gateway on later calls, so switching servers
 // takes effect without restarting the app.
