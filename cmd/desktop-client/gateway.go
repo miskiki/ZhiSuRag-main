@@ -9,38 +9,60 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"strings"
+	"sync"
+	"time"
 
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// desktopSetupPath is served by the asset server (wails:// origin) so the
-// user can reconfigure the server address from the menu at any time.
-const desktopSetupPath = "/__client_setup__"
-
 // clientGateway serves the webview UI over real loopback HTTP: WebView2's
 // virtual-host channel buffers streamed bodies, which would break chat
 // streaming. It also hosts /__desktop__/* native-helper endpoints and
-// injects the desktop shell into HTML responses. See cmd/desktop/gateway.go
-// in the full client for the full rationale.
+// injects the desktop shell into HTML responses. The proxy target can be
+// repointed at runtime (SetTarget) when the user switches servers.
 type clientGateway struct {
-	app     *clientApp
-	baseURL string
+	app       *clientApp
+	baseURL   string
+	mu        sync.RWMutex
+	target    *url.URL
+	targetStr string
+}
+
+// SetTarget repoints the proxy at a new server (used when the user switches
+// servers from the setup page without restarting the app).
+func (g *clientGateway) SetTarget(raw string) error {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return err
+	}
+	g.mu.Lock()
+	g.target = u
+	g.targetStr = raw
+	g.mu.Unlock()
+	return nil
+}
+
+func (g *clientGateway) currentTarget() *url.URL {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+	return g.target
 }
 
 func startClientGateway(app *clientApp, targetURL string) (*clientGateway, error) {
-	target, err := url.Parse(targetURL)
-	if err != nil {
-		return nil, fmt.Errorf("invalid gateway target %q: %w", targetURL, err)
-	}
-
 	g := &clientGateway{app: app}
+	if err := g.SetTarget(targetURL); err != nil {
+		return nil, err
+	}
 
 	proxy := &httputil.ReverseProxy{
 		FlushInterval: -1,
 		Director: func(req *http.Request) {
-			req.URL.Scheme = target.Scheme
-			req.URL.Host = target.Host
-			req.Host = target.Host
+			cur := g.currentTarget()
+			req.URL.Scheme = cur.Scheme
+			req.URL.Host = cur.Host
+			req.Host = cur.Host
+			// Disable upstream compression so HTML injection can see plain
+			// bodies; loopback/LAN bandwidth makes identity encoding cheap.
 			req.Header.Set("Accept-Encoding", "identity")
 			if _, ok := req.Header["User-Agent"]; !ok {
 				req.Header.Set("User-Agent", "ZhiShuClient-Desktop")
@@ -56,7 +78,10 @@ func startClientGateway(app *clientApp, targetURL string) (*clientGateway, error
 			if err != nil {
 				return err
 			}
-			injected := injectDesktopScript(string(body), targetURL)
+			g.mu.RLock()
+			tStr := g.targetStr
+			g.mu.RUnlock()
+			injected := injectDesktopScript(string(body), tStr)
 			resp.Body = io.NopCloser(strings.NewReader(injected))
 			resp.Header.Del("Content-Length")
 			resp.Header.Del("Content-Encoding")
@@ -77,7 +102,7 @@ func startClientGateway(app *clientApp, targetURL string) (*clientGateway, error
 	mux.HandleFunc("/__desktop__/", g.handleDesktopAPI)
 	mux.HandleFunc("/__desktop__/save-blob", g.handleSaveBlob)
 	mux.HandleFunc("/__desktop__/rpc", g.handleRPC)
-	mux.HandleFunc(desktopSetupPath, func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc(clientSetupPath, func(w http.ResponseWriter, r *http.Request) {
 		serveClientSetup(w, r)
 	})
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -104,6 +129,18 @@ func (g *clientGateway) handleDesktopAPI(w http.ResponseWriter, r *http.Request)
 		// Cross-origin probe from the bootstrap page (no sensitive data).
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		writeJSON(w, map[string]interface{}{"ok": true, "gateway": true})
+	case "/__desktop__/probe-target":
+		// Bootstrap 探测当前目标服务器是否可达：可达才把 webview 交给
+		// 服务器页面；不可达则引导回设置页（携带 offline 标记）。
+		target := g.currentTarget().String()
+		client := &http.Client{Timeout: 3 * time.Second}
+		resp, err := client.Get(target + "/config.js")
+		if err != nil {
+			writeJSON(w, map[string]interface{}{"ok": false})
+			return
+		}
+		resp.Body.Close()
+		writeJSON(w, map[string]interface{}{"ok": resp.StatusCode == http.StatusOK})
 	case "/__desktop__/open-external":
 		target := strings.TrimSpace(r.URL.Query().Get("url"))
 		if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
@@ -121,6 +158,52 @@ func (g *clientGateway) handleDesktopAPI(w http.ResponseWriter, r *http.Request)
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+// handleRPC serves setup-page calls (the setup page may run on the gateway
+// origin where Wails bindings are unavailable).
+func (g *clientGateway) handleRPC(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.NotFound(w, r)
+		return
+	}
+	var req struct {
+		Fn   string        `json:"fn"`
+		Args []interface{} `json:"args"`
+	}
+	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
+		writeJSON(w, map[string]interface{}{"ok": false, "error": "invalid body"})
+		return
+	}
+	whitelist := map[string]int{
+		"TestServerURL":       1,
+		"ApplyClientSetup":    1,
+		"GetClientSetupState": 0,
+	}
+	argc, ok := whitelist[req.Fn]
+	if !ok || len(req.Args) != argc {
+		writeJSON(w, map[string]interface{}{"ok": false, "error": "unknown fn"})
+		return
+	}
+	args := make([]string, len(req.Args))
+	for i, v := range req.Args {
+		s, isStr := v.(string)
+		if !isStr {
+			writeJSON(w, map[string]interface{}{"ok": false, "error": "bad arg"})
+			return
+		}
+		args[i] = s
+	}
+	var result interface{}
+	switch req.Fn {
+	case "TestServerURL":
+		result = g.app.TestServerURL(args[0])
+	case "ApplyClientSetup":
+		result = g.app.ApplyClientSetup(args[0])
+	case "GetClientSetupState":
+		result = g.app.GetClientSetupState()
+	}
+	writeJSON(w, map[string]interface{}{"ok": true, "result": result})
 }
 
 // handleSaveBlob persists a base64 payload through the native save dialog.
@@ -145,54 +228,9 @@ func (g *clientGateway) handleSaveBlob(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]interface{}{"ok": true, "path": path})
 }
 
-// clientRPCFns whitelists setup-page RPC calls on the gateway origin.
-var clientRPCFns = map[string]int{
-	"TestServerURL":       1,
-	"ApplyClientSetup":    1,
-	"GetClientSetupState": 0,
-}
-
-func (g *clientGateway) handleRPC(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.NotFound(w, r)
-		return
-	}
-	var req struct {
-		Fn   string        `json:"fn"`
-		Args []interface{} `json:"args"`
-	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
-		writeJSON(w, map[string]interface{}{"ok": false, "error": "invalid body"})
-		return
-	}
-	argc, ok := clientRPCFns[req.Fn]
-	if !ok || len(req.Args) != argc {
-		writeJSON(w, map[string]interface{}{"ok": false, "error": "unknown fn"})
-		return
-	}
-	args := make([]string, len(req.Args))
-	for i, a := range req.Args {
-		s, isStr := a.(string)
-		if !isStr {
-			writeJSON(w, map[string]interface{}{"ok": false, "error": "bad arg"})
-			return
-		}
-		args[i] = s
-	}
-	var result interface{}
-	switch req.Fn {
-	case "TestServerURL":
-		result = g.app.TestServerURL(args[0])
-	case "ApplyClientSetup":
-		result = g.app.ApplyClientSetup(args[0])
-	case "GetClientSetupState":
-		result = g.app.GetClientSetupState()
-	}
-	writeJSON(w, map[string]interface{}{"ok": true, "result": result})
-}
-
 // bootstrapHandler serves the tiny startup page: wait for the gateway, then
-// hand the webview over to the real HTTP origin (the server UI).
+// probe the target server. Reachable → hand the webview to the server UI;
+// unreachable → fall back to the setup page (offline banner shown there).
 func (g *clientGateway) bootstrapHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -228,8 +266,15 @@ const clientBootstrapPageHTML = `<!DOCTYPE html>
     fetch(gw + '/__desktop__/ping', {cache:'no-store'})
       .then(function(r){ return r.json(); })
       .then(function(j){
-        if (j && j.ok) { location.replace(gw + '/'); return; }
-        retry();
+        if (!(j && j.ok)) { retry(); return; }
+        // 网关就绪，再探测目标服务器是否可达
+        return fetch(gw + '/__desktop__/probe-target', {cache:'no-store'})
+          .then(function(r){ return r.json(); })
+          .then(function(t){
+            if (t && t.ok) { location.replace(gw + '/'); return; }
+            // 上次的服务器不可达：回设置页，附带 offline 标记显示提示
+            location.replace(gw + '/__client_setup__?offline=1');
+          });
       })
       .catch(retry);
   }

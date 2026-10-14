@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -18,12 +17,16 @@ import (
 	wailsruntime "github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
+// ── Prefs: last server + connection history ────────────────────────────────
+
 const clientPrefsFileName = "client-prefs.json"
 
-// clientPrefs persists the only thing the slim client needs to know: where
-// the server is.
+const maxHistoryEntries = 5
+
+// clientPrefs persists the last connected server and recent history.
 type clientPrefs struct {
-	ServerURL string `json:"server_url"`
+	ServerURL string   `json:"server_url"`
+	History   []string `json:"history"`
 }
 
 func clientPrefsDir() (string, error) {
@@ -38,73 +41,106 @@ func clientPrefsDir() (string, error) {
 	return dir, nil
 }
 
-func loadClientServerURL() string {
+func loadClientPrefs() clientPrefs {
+	var p clientPrefs
 	dir, err := clientPrefsDir()
 	if err != nil {
-		return ""
+		return p
 	}
 	data, err := os.ReadFile(filepath.Join(dir, clientPrefsFileName))
 	if err != nil {
-		return ""
+		return p
 	}
-	var p clientPrefs
 	if json.Unmarshal(data, &p) != nil {
-		return ""
+		return clientPrefs{}
 	}
-	return NormalizeServerURL(p.ServerURL)
+	p.ServerURL = NormalizeServerURL(p.ServerURL)
+	clean := p.History[:0]
+	seen := map[string]bool{}
+	for _, h := range p.History {
+		h = NormalizeServerURL(h)
+		if h == "" || seen[h] {
+			continue
+		}
+		seen[h] = true
+		clean = append(clean, h)
+	}
+	p.History = clean
+	return p
 }
 
-func saveClientServerURL(raw string) error {
+func saveClientPrefs(p clientPrefs) error {
 	dir, err := clientPrefsDir()
 	if err != nil {
 		return err
 	}
-	data, _ := json.MarshalIndent(clientPrefs{ServerURL: NormalizeServerURL(raw)}, "", "  ")
+	data, _ := json.MarshalIndent(p, "", "  ")
 	return os.WriteFile(filepath.Join(dir, clientPrefsFileName), data, 0o600)
 }
+
+// recordConnected sets the last-used server and moves it to the front of the
+// connection history (deduped, capped at maxHistoryEntries).
+func recordConnected(raw string) {
+	u := NormalizeServerURL(raw)
+	if u == "" {
+		return
+	}
+	p := loadClientPrefs()
+	p.ServerURL = u
+	history := []string{u}
+	for _, h := range p.History {
+		if h == u {
+			continue
+		}
+		history = append(history, h)
+		if len(history) >= maxHistoryEntries {
+			break
+		}
+	}
+	p.History = history
+	_ = saveClientPrefs(p)
+}
+
+// ── App state ───────────────────────────────────────────────────────────────
 
 // clientApp holds Wails-bound state for the slim client shell.
 type clientApp struct {
 	ctx        context.Context
-	serverURL  string
+	gateway    *clientGateway
 	gatewayURL string
 }
 
 func newClientApp() *clientApp { return &clientApp{} }
 
-// NormalizeServerURL cleans a user-entered server address: adds http:// when
-// the scheme is missing, strips trailing slashes and any /api/v1 suffix.
-func NormalizeServerURL(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return ""
-	}
-	if !strings.Contains(trimmed, "://") {
-		trimmed = "http://" + trimmed
-	}
-	u, err := url.Parse(trimmed)
-	if err != nil || u.Host == "" {
-		return ""
-	}
-	if u.Scheme != "http" && u.Scheme != "https" {
-		return ""
-	}
-	// 服务器地址只保留 origin：用户常会带上 /login、/api/v1 等路径，
-	// 一律剥离（端口保留），避免代理基址带路径导致资源 404。
-	u.Path = ""
-	u.RawQuery = ""
-	u.Fragment = ""
-	return u.String()
-}
-
 func (a *clientApp) startup(ctx context.Context) { a.ctx = ctx }
 
-// TestServerURL probes GET {url}/health on a candidate server. Returns ""
+// ensureGateway starts the loopback gateway on first use and (re)points it at
+// targetURL. Reuses the existing gateway on later calls, so switching servers
+// takes effect without restarting the app.
+func (a *clientApp) ensureGateway(targetURL string) (string, error) {
+	if a.gateway != nil {
+		if err := a.gateway.SetTarget(targetURL); err != nil {
+			return "", err
+		}
+		return a.gateway.baseURL, nil
+	}
+	g, err := startClientGateway(a, targetURL)
+	if err != nil {
+		return "", err
+	}
+	a.gateway = g
+	a.gatewayURL = g.baseURL
+	return g.baseURL, nil
+}
+
+// ── Setup-page API (Wails bindings on wails:// origin, RPC on gateway) ─────
+
+// TestServerURL probes GET {url}/config.js on a candidate server. Returns ""
 // on success or a user-readable error (bound method for the setup page).
 func (a *clientApp) TestServerURL(raw string) string {
 	base := NormalizeServerURL(raw)
 	if base == "" {
-		return "地址无效，请输入形如 http://192.168.1.100:80 的服务器地址"
+		return "地址无效，请输入形如 http://192.168.10.131 的服务器地址（不带 /login 等路径）"
 	}
 	client := &http.Client{Timeout: 5 * time.Second}
 	// 探针用前端自带的 /config.js（nginx 静态提供，不受 SPA fallback 影响）：
@@ -119,55 +155,39 @@ func (a *clientApp) TestServerURL(raw string) string {
 	}
 	buf := make([]byte, 256)
 	n, _ := resp.Body.Read(buf)
-	if strings.Contains(strings.ToLower(string(buf[:n])), "<!doctype") ||
-		strings.Contains(strings.ToLower(string(buf[:n])), "<html") {
+	lower := strings.ToLower(string(buf[:n]))
+	if strings.Contains(lower, "<!doctype") || strings.Contains(lower, "<html") {
 		return "该地址返回的不是智述系统页面，请确认端口是否为前端端口（默认 80，不带 /login 等路径）"
 	}
 	return ""
 }
 
-// GetClientSetupState returns the saved server URL for the setup page.
-func (a *clientApp) GetClientSetupState() map[string]string {
-	return map[string]string{"serverURL": loadClientServerURL()}
+// GetClientSetupState returns everything the setup page needs to prefill:
+// last server, connection history, and the baked-in default address.
+func (a *clientApp) GetClientSetupState() map[string]interface{} {
+	p := loadClientPrefs()
+	return map[string]interface{}{
+		"serverURL":  p.ServerURL,
+		"history":    p.History,
+		"defaultURL": defaultServerURL,
+	}
 }
 
-// ApplyClientSetup validates and persists the server address, then restarts
-// the app so the connection takes effect. Returns "" on success or a
-// user-readable error message.
-func (a *clientApp) ApplyClientSetup(raw string) string {
+// ApplyClientSetup validates and persists the server address, points the
+// gateway at it, records connection history, and returns the gateway URL the
+// setup page should navigate to — no app restart needed. Returns a map with
+// "error" (empty on success) and "gatewayURL".
+func (a *clientApp) ApplyClientSetup(raw string) map[string]interface{} {
 	if msg := a.TestServerURL(raw); msg != "" {
-		return msg
+		return map[string]interface{}{"error": msg}
 	}
-	if err := saveClientServerURL(raw); err != nil {
-		return err.Error()
-	}
-	go func() {
-		time.Sleep(400 * time.Millisecond) // let the webview receive the response
-		restartClient(a.ctx)
-	}()
-	return ""
-}
-
-// restartClient spawns a fresh instance and quits the current one.
-func restartClient(ctx context.Context) {
-	execPath, err := os.Executable()
+	base := NormalizeServerURL(raw)
+	gwURL, err := a.ensureGateway(base)
 	if err != nil {
-		os.Exit(1)
+		return map[string]interface{}{"error": "启动连接通道失败：" + err.Error()}
 	}
-	if runtime.GOOS == "windows" {
-		if err := exec.Command("cmd.exe", "/C", "start", "", execPath).Start(); err != nil {
-			os.Exit(1)
-		}
-	} else {
-		if err := exec.Command(execPath).Start(); err != nil {
-			os.Exit(1)
-		}
-	}
-	if ctx != nil {
-		wailsruntime.Quit(ctx)
-	} else {
-		os.Exit(0)
-	}
+	recordConnected(base)
+	return map[string]interface{}{"error": "", "gatewayURL": gwURL}
 }
 
 // ── Native helpers used by the gateway endpoints ────────────────────────────
@@ -272,7 +292,7 @@ func (a *clientApp) CheckForUpdates() {
 	})
 }
 
-// ── Desktop API handlers (shared by wails:// asset server and gateway) ──────
+// ── Desktop API handlers（wails:// assetserver 与网关共用）──────────────────
 
 func (a *clientApp) handleRPC(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -357,9 +377,4 @@ func (a *clientApp) handleOpenExternal(w http.ResponseWriter, r *http.Request) {
 		wailsruntime.BrowserOpenURL(a.ctx, target)
 	}
 	writeJSON(w, map[string]interface{}{"ok": true})
-}
-
-func writeJSON(w http.ResponseWriter, v interface{}) {
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	_ = json.NewEncoder(w).Encode(v)
 }

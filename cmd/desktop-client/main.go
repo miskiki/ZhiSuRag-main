@@ -28,13 +28,13 @@ func main() {
 	defer startupLogClose()
 	startupLogf("boot: client version=%s os=%s", clientVersion, runtime.GOOS)
 
-	serverURL := loadClientServerURL()
-	startupLogf("server URL: %q", serverURL)
+	prefs := loadClientPrefs()
+	startupLogf("saved server: %q history=%v", prefs.ServerURL, prefs.History)
 
 	app := newClientApp()
 
 	var assetHandler http.Handler
-	if serverURL == "" {
+	if prefs.ServerURL == "" {
 		// First run / reconfiguration: setup page plus desktop RPC routes so
 		// the page works even when Wails bindings are unavailable.
 		mux := http.NewServeMux()
@@ -50,16 +50,16 @@ func main() {
 		})
 		mux.HandleFunc("/", serveClientSetup)
 		assetHandler = mux
+		startupLogf("mode: setup page (no saved server)")
 	} else {
-		gateway, err := startClientGateway(app, serverURL)
+		gwURL, err := app.ensureGateway(prefs.ServerURL)
 		if err != nil {
 			startupLogf("gateway failed: %v", err)
 			fmt.Fprintln(os.Stderr, "gateway:", err)
 			os.Exit(1)
 		}
-		app.gatewayURL = gateway.baseURL
-		startupLogf("gateway ready: %s -> %s", gateway.baseURL, serverURL)
-		assetHandler = gateway.bootstrapHandler()
+		startupLogf("gateway ready: %s -> %s", gwURL, prefs.ServerURL)
+		assetHandler = app.gateway.bootstrapHandler()
 	}
 
 	// Windows: verify the WebView2 runtime before creating the window.
@@ -73,9 +73,8 @@ func main() {
 	}
 
 	AppMenu := buildAppMenu(app)
-	_ = AppMenu
 
-	err := wails.Run(&options.App{
+	wailsErr := wails.Run(&options.App{
 		Title:  "ZhiShu Client · 智枢文渊",
 		Width:  1280,
 		Height: 800,
@@ -97,11 +96,9 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 255},
 	})
 
-	if err != nil {
-		startupLogf("wails.Run failed: %v", err)
+	if wailsErr != nil {
+		startupLogf("wails.Run failed: %v", wailsErr)
 		startupLogClose()
-		fmt.Fprintln(os.Stderr, "Error:", err.Error())
+		fmt.Fprintln(os.Stderr, "Error:", wailsErr.Error())
 	}
 }
-
-// buildAppMenu wires the (small) client menu bar.

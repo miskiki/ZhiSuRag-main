@@ -66,6 +66,13 @@ const clientSetupPageHTML = `<!DOCTYPE html>
   <div class="logo"><div class="logo-badge">枢</div><h1>智枢文渊客户端 · 服务器设置</h1></div>
   <div class="sub">填入智枢系统服务器的地址并保存，客户端将直接连接该服务器使用。账号、知识库与配置均保存在服务器上，与网页端完全一致。</div>
 
+  <div id="offline-banner" style="display:none;background:#fff4e5;border:1px solid #f0d9b5;border-radius:9px;padding:10px 13px;margin-bottom:14px;color:#8a5a00;font-size:12.5px;line-height:1.6;">
+    ⚠ 上次连接的服务器暂时无法访问。请检查服务器状态，或从下方历史记录中选择其他地址。
+  </div>
+  <div id="history-box" style="display:none;margin-bottom:14px;">
+    <label style="margin-bottom:5px;">历史连接记录（点击选用）</label>
+    <div id="history-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+  </div>
   <label for="server-url">服务器地址（平时浏览器访问系统使用的地址）</label>
   <div class="row">
     <input type="text" id="server-url" placeholder="http://192.168.1.100" spellcheck="false">
@@ -141,10 +148,11 @@ const clientSetupPageHTML = `<!DOCTYPE html>
   btnSave.addEventListener('click', function(){
     var raw = urlInput.value.trim();
     btnSave.disabled = true;
-    desktopCall('ApplyClientSetup', [raw]).then(function(err){
-      if (err) { alert(err); btnSave.disabled = false; return; }
+    desktopCall('ApplyClientSetup', [raw]).then(function(res){
+      if (res && res.error) { alert(res.error); btnSave.disabled = false; return; }
       document.getElementById('main').style.display = 'none';
       document.getElementById('done').style.display = 'block';
+      setTimeout(function(){ location.replace((res.gatewayURL || '.') + '/'); }, 1200);
     }).catch(function(e){
       alert('保存失败：' + e);
       btnSave.disabled = false;
@@ -157,11 +165,38 @@ const clientSetupPageHTML = `<!DOCTYPE html>
     return;
   }
   desktopCall('GetClientSetupState', []).then(function(s){
-    if (s && s.serverURL) {
-      urlInput.value = s.serverURL;
+      var prefill = '';
+      if (s.serverURL) { prefill = s.serverURL; }
+      else if (s.history && s.history.length) { prefill = s.history[0]; }
+      else if (s.defaultURL) { prefill = s.defaultURL; }
+      if (prefill) { urlInput.value = prefill; }
+      if (location.search.indexOf('offline=1') !== -1) {
+        testMsg.className = 'err';
+        testMsg.textContent = '⚠ 上次连接的服务器暂时无法访问，请检查地址或服务器状态。';
+      }
+      // 渲染历史连接记录
+      var hist = (s.history && s.history.length) ? s.history : [];
+      if (!hist.length && s.serverURL) { hist = [s.serverURL]; }
+      var box = document.getElementById('history-list');
+      if (!box) return;
+      box.innerHTML = '';
+      for (var i = 0; i < hist.length; i++) {
+        (function(u){
+          if (!u) return;
+          var chip = document.createElement('div');
+          chip.textContent = u;
+          chip.style.cssText = 'border:1px solid #dfe8e2;border-radius:7px;padding:8px 12px;font-size:13px;'+
+            'cursor:pointer;background:#fff;color:#1f2d27;';
+          chip.onmouseenter = function(){ chip.style.borderColor = '#21a35a'; chip.style.background = '#f2faf5'; };
+          chip.onmouseleave = function(){ chip.style.borderColor = '#dfe8e2'; chip.style.background = '#fff'; };
+          chip.onclick = function(){ urlInput.value = u; btnTest.click(); };
+          box.appendChild(chip);
+        })(hist[i]);
+      }
+      var hb = document.getElementById('history-box');
+      if (hb && hist.length) { hb.style.display = 'block'; }
       refreshSave();
-    }
-  }).catch(function(){});
+    }).catch(function(){});
 })();
 </script>
 </body>
